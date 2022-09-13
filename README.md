@@ -1,4 +1,4 @@
-# scNanoGPS_v0.10.1
+# scNanoGPS
 scNanoGPS is a computational toolkit for analyzing high throughput single cell nanopore sequencing data to detect Genotypes and Phenotype Simultaneously from same cells.  scNanoGPS includes 5 major steps: 1) **NanoQC** to perform quality control of the raw seqeucning data; 2) **Scanner** to scan and filter out reads that do not have expected adapater sequence patterns, i.e., TrueSeq Read 1 adapter sequence, TSO adaper sequence, poly (A/T)n block sequence,  Cell Barcodes (CB) and unique molecule identifier (UMI) sequence blocks; 3) **Assigner** to detect the list of true cell barcodes, merge cell barcodes with sequencing errors and assign raw reads into single cells; 4) **Curator** to detect reads with true UMIs and collapse them to make consensus sequences of individual molecules to curate sequencing errors on gene bodies; 5) **Reporter** to detect single cell transcriptomes, single cell gene isoforms and single cell mutations from consensus single cell long reads data.
 
 # Index
