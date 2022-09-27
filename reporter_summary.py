@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import time, os, sys, gzip, re, subprocess
+import time, os, sys, glob, gzip, re, subprocess
 import numpy as np
 import pandas as pd
 from optparse import OptionParser
