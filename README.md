@@ -32,8 +32,8 @@ The scNanoGPS pipeline is built with python3. We recommend users to use anaconda
 
 - Example codes for obtaining scNanoGPS from GitHub and installation of dependencies:
   ```
-  git clone https://github.com/gaolabtools/scNanoGPS_v0.10/
-  cd scNanoGPS_v0.10
+  git clone https://github.com/gaolabtools/scNanoGPS/
+  cd scNanoGPS
   pip3 install -r requirements.txt
   ```
 
