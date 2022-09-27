@@ -108,9 +108,10 @@ def precheck(parser, options, arguments):
 		sys.exit(1)
 	if not os.path.isdir(options.o_dir):
 		os.system("mkdir " + options.o_dir)
-		options.fq_o_name  = os.path.join(options.o_dir, options.fq_o_name)
-		options.bc_f_name  = os.path.join(options.o_dir, options.bc_f_name)
-		options.log_f_name = os.path.join(options.o_dir, options.log_f_name)
+
+	options.fq_o_name  = os.path.join(options.o_dir, options.fq_o_name)
+	options.bc_f_name  = os.path.join(options.o_dir, options.bc_f_name)
+	options.log_f_name = os.path.join(options.o_dir, options.log_f_name)
 
 	options.isFile = os.path.isfile(options.fq_f_name)
 	options.isDir  = os.path.isdir(options.fq_f_name)
