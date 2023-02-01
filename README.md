@@ -209,6 +209,8 @@ To boost the scanning speed, we scan the first and last 100 nucleotides of reads
                           Scoring threshold for alignment search. Default: 0.4
     --batching_no=BATCH_NO
                           Number of reads for batch processing. Default: 1000
+    --scanning_region=SCAN_REGION
+                        Region length for adaptor scanning. Default: 100
     --debug_mode=DEBUG_MODE
                           Debug mode switch. Default: False
     --penalty_matching=DP_MA
