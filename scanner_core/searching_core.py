@@ -1,8 +1,8 @@
-def getHeader(na_seq):
-	return na_seq[0: 100]
+def getHeader(na_seq, options):
+	return na_seq[0: options.scan_region]
 
-def getTail(na_seq):
-	return na_seq[-100:len(na_seq)].translate(str.maketrans({'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}))[::-1]
+def getTail(na_seq, options):
+	return na_seq[-options.scan_region:len(na_seq)].translate(str.maketrans({'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}))[::-1]
 
 def mySort(posList, rev = False):
 	posList = list(filter(None, posList))
@@ -112,11 +112,11 @@ def ten_nano_workflow(read_data, options):
 	if options.debug_mode:
 		print(str(read_data['rid']))
 
-	#===get head/tail 100 of na_seq===
-	na_seq_header = getHeader(read_data['na_seq'])
-	na_seq_tail   = getTail(read_data['na_seq'])
-	qu_seq_header = getHeader(read_data['qu_seq'])
-	qu_seq_tail   = getTail(read_data['qu_seq'])
+	#===get head/tail region of na_seq===
+	na_seq_header = getHeader(read_data['na_seq'], options)
+	na_seq_tail   = getTail(read_data['na_seq'], options)
+	qu_seq_header = getHeader(read_data['qu_seq'], options)
+	qu_seq_tail   = getTail(read_data['qu_seq'], options)
 
 	#===Step 1: Brute force median search===
 	ht_res = median_search(na_seq_header, options.polyT, options.matching_percentage)
@@ -125,11 +125,11 @@ def ten_nano_workflow(read_data, options):
 	#===Step 2: Precisely search===
 	h5_ps_res, h3_ps_res, t5_ps_res, t3_ps_res = None, None, None, None
 	if ht_res:
-		h3_ps_res = precise_search(na_seq_header, options.adaptor_three_p, 0, 100, options.scoring_threshold, options.dp_penalty)
-		t5_ps_res = precise_search(na_seq_tail,   options.adaptor_five_p,  0, 100, options.scoring_threshold, options.dp_penalty)
+		h3_ps_res = precise_search(na_seq_header, options.adaptor_three_p, 0, options.scan_region, options.scoring_threshold, options.dp_penalty)
+		t5_ps_res = precise_search(na_seq_tail,   options.adaptor_five_p,  0, options.scan_region, options.scoring_threshold, options.dp_penalty)
 	if tt_res:
-		t3_ps_res = precise_search(na_seq_tail,   options.adaptor_three_p, 0, 100, options.scoring_threshold, options.dp_penalty)
-		h5_ps_res = precise_search(na_seq_header, options.adaptor_five_p,  0, 100, options.scoring_threshold, options.dp_penalty)
+		t3_ps_res = precise_search(na_seq_tail,   options.adaptor_three_p, 0, options.scan_region, options.scoring_threshold, options.dp_penalty)
+		h5_ps_res = precise_search(na_seq_header, options.adaptor_five_p,  0, options.scan_region, options.scoring_threshold, options.dp_penalty)
 
 	#===Step 3: tie breaker for co-existence of h3 and t3===
 	#===use BC+UMI+polyT to break tie===

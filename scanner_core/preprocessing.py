@@ -70,6 +70,10 @@ def getOptions():
                           nargs = 1, type = "int",
                           help = "Number of reads for batch processing. "
                                  "Default: 1000")
+	parser.add_option("--scanning_region", dest = "scan_region",             default = 100,
+                          nargs = 1, type = "int",
+                          help = "Region length for adaptor scanning. "
+                                 "Default: 100")
 	parser.add_option("--debug_mode", dest = "debug_mode",                   default = False,
                           nargs = 1, type = "string",
                           help = "Debug mode switch. "
@@ -147,6 +151,7 @@ def precheck(parser, options, arguments):
 		logger.write("\t5'-adaptor sequence:           " + str(options.adaptor_five_p) + "\n")
 		logger.write("\t3'-adaptor sequence:           " + str(options.adaptor_three_p) + "\n")
 		logger.write("\tPolyT sequence:                " + str(options.polyT) + "\n")
+		logger.write("\tScanning region length:        " + str(options.scan_region) + "\n")
 		logger.write("\n")
 
 		logger.write("Penalty for dynamic programming:\n")

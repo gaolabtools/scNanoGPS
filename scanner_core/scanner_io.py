@@ -58,10 +58,10 @@ def output_params(options, rid, counter, start_time):
 		logger.write("Time elapse: %d : %d : %.2f" % (hours, minutes, seconds) + "\n")
 		logger.write("Detecting rate: %.2f" % round((counter['counter_h_3p'] + counter['counter_t_3p']) / rid * 100, 2) + '%' + "\n\n")
 		logger.write("Result counting:\n")
-		logger.write("\tNumber of 3'-adaptor located on the first 100 nt. region:           \t" + str(counter['counter_h_3p']) + "\n")
-		logger.write("\tNumber of 3'-adaptor + polyT on the first 100 nt. region:           \t" + str(counter['counter_h_3p_polyT']) + "\n")
-		logger.write("\tNumber of 3'-adaptor located on the last  100 nt. region:           \t" + str(counter['counter_t_3p']) + "\n")
-		logger.write("\tNumber of 3'-adaptor + polyT on the last  100 nt. region:           \t" + str(counter['counter_t_3p_polyT']) + "\n\n")
+		logger.write("\tNumber of 3'-adaptor located on the read head region:           \t" + str(counter['counter_h_3p']) + "\n")
+		logger.write("\tNumber of 3'-adaptor + polyT on the read head region:           \t" + str(counter['counter_h_3p_polyT']) + "\n")
+		logger.write("\tNumber of 3'-adaptor located on the read tail region:           \t" + str(counter['counter_t_3p']) + "\n")
+		logger.write("\tNumber of 3'-adaptor + polyT on the read tail region:           \t" + str(counter['counter_t_3p_polyT']) + "\n\n")
 
 		logger.write("Alignment counting:\n")
 		logger.write("\tNumber of 3'-adaptor having no mismatch:                            \t" + str(counter['counter_h_perfect_3p']  + counter['counter_t_perfect_3p'])  + "\n\n")
@@ -71,8 +71,8 @@ def output_params(options, rid, counter, start_time):
 		logger.write("\tNumber of 3'-adaptor having in/del at the last one position:        \t" + str(counter['counter_h_last_1_i']    + counter['counter_t_last_1_i'])    + "\n")
 		logger.write("\tNumber of 3'-adaptor having in/del at the last two position:        \t" + str(counter['counter_h_last_2_i']    + counter['counter_t_last_2_i'])    + "\n")
 		logger.write("\tNumber of 3'-adaptor having in/del at the last three position:      \t" + str(counter['counter_h_last_3_i']    + counter['counter_t_last_3_i'])    + "\n\n")
-		logger.write("\tNumber of rescued truncated 3'-adaptor on the first 100 nt. region: \t" + str(counter['counter_h_partial_3p']) + "\n")
-		logger.write("\tNumber of rescued truncated 3'-adaptor on the last  100 nt. region: \t" + str(counter['counter_t_partial_3p']) + "\n\n")
+		logger.write("\tNumber of rescued truncated 3'-adaptor on the read head region: \t" + str(counter['counter_h_partial_3p']) + "\n")
+		logger.write("\tNumber of rescued truncated 3'-adaptor on the read tail region: \t" + str(counter['counter_t_partial_3p']) + "\n\n")
 
 		logger.write("Finish time stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()) + "\n")
 
