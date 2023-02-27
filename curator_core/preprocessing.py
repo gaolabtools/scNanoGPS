@@ -37,7 +37,7 @@ def getOptions():
                           help = "Levenshtein distance for merging UMI. "
                                  "Default: 2")
 	parser.add_option("--keep_meta", dest = "keep_meta", nargs = 1, default = None,
-                          help = "Keep meta data, e.g. bam files, for futher checking. "
+                          help = "Set it to 1 to keep meta data, e.g. sam files, for futher checking. "
                                  "Default: None")
 	parser.add_option("--softclipping_thr", dest = "softclipping_thr", nargs = 1, default = 0.8,
                           help = "Threshold for softclipping. "
