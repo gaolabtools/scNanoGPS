@@ -299,7 +299,7 @@ The master FastQ file of all cells is demultiplexed according to the true CB lis
     --log=LOG_F_NAME      Log file name. Default: curator.log.txt
     --umi_ld=UMI_LD       Levenshtein distance for merging UMI. Default: 2
     --keep_meta=KEEP_META
-                          Keep meta data, e.g. bam files, for futher checking.
+                          Set it to 1 to keep meta data, e.g. sam files, for futher checking.
                           Default: None
     --softclipping_thr=SOFTCLIPPING_THR
                           Threshold for softclipping. Default: 0.8
