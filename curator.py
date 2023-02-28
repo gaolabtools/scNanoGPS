@@ -139,25 +139,27 @@ if __name__ == "__main__":
 		      "-@ " + str(options.ncores) + " " + \
 		      "-T " + options.ref_genome + " " + \
 		      "-o " + os.path.join(options.tmp_dir, fq_pref[0]) + ".unsorted.bam"
-		os.system(cmd + "&> /dev/null")
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
 
-		cmd = "rm " + os.path.join(options.tmp_dir, fq_pref[0]) + ".sam"
-		os.system(cmd)
+		if not options.keep_meta:
+			cmd = "rm " + os.path.join(options.tmp_dir, fq_pref[0]) + ".sam"
+			os.system(cmd)
 
 		print(stat_msg + "sorting bam ..." + " " * 20, end = "\r", flush = True)
 		cmd = options.samtools + " sort " + \
 		      os.path.join(options.tmp_dir, fq_pref[0]) + ".unsorted.bam " + \
 		      "-@ " + str(options.ncores) + " " + \
 		      "-o " + os.path.join(options.tmp_dir, fq_pref[0]) + ".minimap2.bam"
-		os.system(cmd + "&> /dev/null")
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
 
-		cmd = "rm " + os.path.join(options.tmp_dir, fq_pref[0]) + ".unsorted.bam"
-		os.system(cmd)
+		if not options.keep_meta:
+			cmd = "rm " + os.path.join(options.tmp_dir, fq_pref[0]) + ".unsorted.bam"
+			os.system(cmd)
 
 		print(stat_msg + "indexing ..." + " " * 20, end = "\r", flush = True)
 		cmd = options.samtools + " index " + \
 		      os.path.join(options.tmp_dir, fq_pref[0]) + ".minimap2.bam"
-		os.system(cmd + "&> /dev/null")
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
 
 		#===filter softclipping===
 		print(stat_msg + "filtering ..." + " " * 20, end = "\r", flush = True)
@@ -183,7 +185,7 @@ if __name__ == "__main__":
 
 		cmd = options.samtools + " index " + \
 		      os.path.join(options.tmp_dir, fq_pref[0]) + ".filtered.bam"
-		os.system(cmd + "&> /dev/null")
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
 
 		#===UMI collapse===
 		print(stat_msg + "collapsing UMI..." + " " * 20, end = "\r", flush = True)
@@ -283,11 +285,11 @@ if __name__ == "__main__":
 		      os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.sam"
 		os.system(cmd)
 
-		cmd = options.samtools + " view -Sb " + \
-		      os.path.join(options.tmp_dir, fq_pref[0]) + ".consensus.sam " + \
-		      "-@ " + str(options.ncores) + " " + \
-		      "-T " + options.ref_genome + " " + \
-		      "-o " + os.path.join(options.tmp_dir, fq_pref[0]) + ".consensus.bam"
+#		cmd = options.samtools + " view -Sb " + \
+#		      os.path.join(options.tmp_dir, fq_pref[0]) + ".consensus.sam " + \
+#		      "-@ " + str(options.ncores) + " " + \
+#		      "-T " + options.ref_genome + " " + \
+#		      "-o " + os.path.join(options.tmp_dir, fq_pref[0]) + ".consensus.bam"
 
 		if not options.keep_meta:
 			cmd = "rm " + \
@@ -316,26 +318,28 @@ if __name__ == "__main__":
 		      "-@ " + str(options.ncores) + " " + \
 		      "-T " + options.ref_genome + " " + \
 		      "-o " + os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.unsorted.bam"
-		os.system(cmd + "&> /dev/null")
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
 
-		cmd = "rm " + \
-		      os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.sam"
-		os.system(cmd)
+		if not options.keep_meta:
+			cmd = "rm " + \
+			      os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.sam"
+			os.system(cmd)
 
 		print(stat_msg + "sorting curated bam ..." + " " * 20, end = "\r", flush = True)
 		cmd = options.samtools + " sort " + \
 		      os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.unsorted.bam " + \
 		      "-@ " + str(options.ncores) + " " + \
 		      "-o " + os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.minimap2.bam"
-		os.system(cmd + "&> /dev/null")
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
 
-		cmd = "rm " + os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.unsorted.bam"
-		os.system(cmd)
+		if not options.keep_meta:
+			cmd = "rm " + os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.unsorted.bam"
+			os.system(cmd)
 
 		print(stat_msg + "indexing curated bam ..." + " " * 20, end = "\r", flush = True)
 		cmd = options.samtools + " index " + \
 		      os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.minimap2.bam"
-		os.system(cmd + "&> /dev/null")
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
 
 		cmd = options.samtools + " view " + \
 		      os.path.join(options.tmp_dir, fq_pref[0]) + ".curated.minimap2.bam | " + \
