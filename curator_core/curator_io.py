@@ -35,15 +35,17 @@ def sys_run(cmd):
 		stderr = subprocess.PIPE)
 
 	stdout, stderr = proc.communicate()
+	proc.wait()
 
 	return proc.returncode, stdout, stderr
 
 def filter_softclipping(softclipping_thr, input_bam, output_bam, drop_bam):
-	import pysam
+	import os, pysam
 
 	bam_i = pysam.AlignmentFile(input_bam,  "rb")
 	bam_o = pysam.AlignmentFile(output_bam, "wb", template = bam_i)
-	bam_d = pysam.AlignmentFile(drop_bam,   "wb", template = bam_i)
+
+	clipped_rid_dict = dict()
 
 	for read in bam_i.fetch():
 		no_m, no_s = 0, 0
@@ -51,7 +53,7 @@ def filter_softclipping(softclipping_thr, input_bam, output_bam, drop_bam):
 		for cigar in read.cigartuples:
 			if cigar[0] == 0:
 				no_m += cigar[1]
-			if cigar[0] == 4:
+			if cigar[0] == 4 or cigar[0] == 5:
 				no_s += cigar[1]
 
 #       M       BAM_CMATCH      0
@@ -68,10 +70,19 @@ def filter_softclipping(softclipping_thr, input_bam, output_bam, drop_bam):
 		if (no_m / (no_m + no_s)) >= softclipping_thr:
 			bam_o.write(read)
 		else:
-			bam_d.write(read)
+			clipped_rid_dict.update({read.query_name: 1})
 
 	bam_i.close()
 	bam_o.close()
+
+	bam_i = pysam.AlignmentFile(input_bam,  "rb")
+	bam_d = pysam.AlignmentFile(drop_bam,   "wb", template = bam_i)
+
+	for read in bam_i.fetch():
+		if read.query_name in clipped_rid_dict:
+			bam_d.write(read)
+
+	bam_i.close()
 	bam_d.close()
 
 def split_reads_by_pos(bam_i, seq_dict):
