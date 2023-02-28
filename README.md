@@ -348,6 +348,10 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
   # or
   
   python3 reporter_expression.py -t 2 --gtf example/GRCh38_chr22.gtf --featurecounts /path/to/subread_folder/bin/featureCounts
+  
+  # Please add "min_gene_no 1" for test because the example fastq is a subset pool and contains only a dozen of genes. 
+  
+  python3 reporter_expression.py -t 2 --gtf example/GRCh38_chr22.gtf --min_gene_no 1 --featurecounts $(which featureCounts)
   ```
 
 ### 5.2 Single cell isoform profile
