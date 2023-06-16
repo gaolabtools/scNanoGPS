@@ -1,0 +1,50 @@
+SAMPLE_SHEET: "sockeye_config_A375/samples.csv"
+KIT_CONFIGS: "sockeye_config_A375/kit_configs.csv"
+
+OUTPUT_BASE: ~/data/benchmarking/A375/A375_by_sockeye/
+
+################################################################################
+# 10x SUPPORTING FILES                                                         #
+################################################################################
+# Reference files can be downloaded from the 10x website using either curl or wget:
+# For the human GRCh38 reference, the commands would be:
+# curl -O https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2020-A.tar.gz
+# or
+# wget https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2020-A.tar.gz
+
+######### REF_GENOME_DIR #########
+# REF_GENOME_DIR refers the path to reference directory as downloaded from 10x,
+# e.g. /FULL/PATH/TO/10X/DOWNLOADS/refdata-gex-GRCh38-2020-A
+
+REF_GENOME_DIR: ~/genome/refdata-cellranger-arc-GRCh38-2020-A-2.0.0/
+
+MAX_THREADS: 30
+
+READ_STRUCTURE_BATCH_SIZE: 40000
+READ_STRUCTURE_FLAGS: ""
+
+BARCODE_ADAPTER1_SUFF_LENGTH: 10
+BARCODE_MIN_QUALITY: 1
+BARCODE_KNEEPLOT_FLAGS: ""
+BARCODE_MAX_ED: 2
+BARCODE_MIN_ED_DIFF: 2
+
+GENE_ASSIGNS_MINQV: 60
+
+UMI_GENOMIC_INTERVAL: 1000
+UMI_CELL_GENE_MAX_READS: 20000
+UMI_CLUSTER_MAX_THREADS: 8
+
+MATRIX_MIN_GENES: 200
+MATRIX_MIN_CELLS: 3
+MATRIX_MAX_MITO: 20
+MATRIX_NORM_COUNT: 10000
+
+# Using a comma-separated list, specify which genes should be annotated in the
+# UMAP plots (e.g. CD19,PAX5,XBP1)
+UMAP_PLOT_GENES: CD19,CD24,CD27,CD38,CD79A,CD79B,PAX5,XBP1
+
+# Set the maximum resources to devote to the minimap2 alignment step
+RESOURCES_MM2_MEM_GB: 50
+RESOURCES_MM2_MAX_THREADS: 12
+RESOURCES_MM2_FLAGS: "-I 4G"

@@ -1,0 +1,119 @@
+#! Rscript
+
+library(tidyverse)
+
+tenX_bc      <- data.frame(read.table(gzfile("H2030_10X.barcode_list.tsv.gz"), header=F, sep="-"))
+tenX_df      <- data.frame(read.table("737K-arc-v1.txt", header=F, sep="\t"))
+scNanoGPS_bc <- data.frame(read.table("H2030_scNanoGPS.barcode_list.txt", header=F, sep="_"))
+blaze_bc     <- data.frame(read.table("H2030_blaze.barcode_list.csv", header=F, sep="-"))
+sockeye_bc   <- data.frame(read.table("H2030_sockeye.barcode_list.csv", header=F, sep="\t"))
+
+names(tenX_bc)         <- c("BC", "V2")
+
+names(tenX_df)         <- c("BC")
+tenX_df$tenX           <- sapply(tenX_df$BC, function(x){if(x %in% tenX_bc$BC){return(1)}else{return(NA)}})
+
+names(scNanoGPS_bc)    <- c("V1", "V2", "BC")
+scNanoGPS_bc$scNanoGPS <- 1
+scNanoGPS_bc           <- scNanoGPS_bc[, c("BC", "scNanoGPS")]
+
+names(blaze_bc)        <- c("BC", "V2")
+blaze_bc$BLAZE         <- 1
+blaze_bc               <- blaze_bc[, c("BC", "BLAZE")]
+
+names(sockeye_bc)      <- "BC"
+sockeye_bc$Sockeye     <- 1
+
+m_df <- merge(x=tenX_df, y=scNanoGPS_bc, by.x="BC", by.y="BC", all=T)
+m_df <- merge(x=m_df,    y=blaze_bc,     by.x="BC", by.y="BC", all=T)
+m_df <- merge(x=m_df,    y=sockeye_bc,   by.x="BC", by.y="BC", all=T)
+
+write.table(m_df, file = gzfile("3_comp_10X_scNanoGPS_BLAZE_sockeye.H2030.tsv.gz"), row.names=F, col.names=T, quote=F, sep="\t")
+
+m_df %>%
+   group_by(tenX, scNanoGPS, BLAZE, Sockeye) %>%
+   summarize(n=n()) %>%
+   as.data.frame() ->
+   summarise_df
+
+#    tenX scNanoGPS BLAZE Sockeye      n
+# 1     1         1     1       1   3627
+# 2     1         1    NA       1      2
+# 3     1         1    NA      NA      2
+# 4     1        NA     1       1    251
+# 5     1        NA     1      NA      1
+# 6     1        NA    NA       1      9
+# 7     1        NA    NA      NA    219
+# 8    NA         1     1       1     56
+# 9    NA         1    NA       1      1
+# 10   NA         1    NA      NA      5
+# 11   NA        NA     1       1     51
+# 12   NA        NA     1      NA      2
+# 13   NA        NA    NA       1      3
+# 14   NA        NA    NA      NA 732095
+
+total_n <- sum(summarise_df$n)
+# [1] 736324
+
+
+
+scNanoGPS_TP <- sum(summarise_df[which(!is.na(summarise_df$tenX) & !is.na(summarise_df$scNanoGPS)), "n"])
+scNanoGPS_TN <- sum(summarise_df[which( is.na(summarise_df$tenX) &  is.na(summarise_df$scNanoGPS)), "n"])
+scNanoGPS_FP <- sum(summarise_df[which( is.na(summarise_df$tenX) & !is.na(summarise_df$scNanoGPS)), "n"])
+scNanoGPS_FN <- sum(summarise_df[which(!is.na(summarise_df$tenX) &  is.na(summarise_df$scNanoGPS)), "n"])
+
+scNanoGPS_TPR <- scNanoGPS_TP / (scNanoGPS_TP + scNanoGPS_FP)
+# [1] 0.9832115
+scNanoGPS_FPR <- scNanoGPS_FP / (scNanoGPS_TP + scNanoGPS_FP)
+# [1] 0.01678852
+scNanoGPS_TNR <- scNanoGPS_TN / (scNanoGPS_TN + scNanoGPS_FN)
+# [1] 0.9993448
+scNanoGPS_FNR <- scNanoGPS_FN / (scNanoGPS_TN + scNanoGPS_FN)
+# [1] 0.0006551729
+scNanoGPS_F1  <- 2*scNanoGPS_TP / (2*scNanoGPS_TP + scNanoGPS_FP + scNanoGPS_FN)
+# [1] 0.9305484
+scNanoGPS_ACC <- (scNanoGPS_TP + scNanoGPS_TN) / total_n
+# [1] 0.9992639
+
+
+
+blaze_TP <- sum(summarise_df[which(!is.na(summarise_df$tenX) & !is.na(summarise_df$BLAZE)), "n"])
+blaze_TN <- sum(summarise_df[which( is.na(summarise_df$tenX) &  is.na(summarise_df$BLAZE)), "n"])
+blaze_FP <- sum(summarise_df[which( is.na(summarise_df$tenX) & !is.na(summarise_df$BLAZE)), "n"])
+blaze_FN <- sum(summarise_df[which(!is.na(summarise_df$tenX) &  is.na(summarise_df$BLAZE)), "n"])
+
+blaze_TPR <- blaze_TP / (blaze_TP + blaze_FP)
+# [1] 0.972668
+blaze_FPR <- blaze_FP / (blaze_TP + blaze_FP)
+# [1] 0.027332
+blaze_TNR <- blaze_TN / (blaze_TN + blaze_FN)
+# [1] 0.9996832
+blaze_FNR <- blaze_FN / (blaze_TN + blaze_FN)
+# [1] 0.0003167945
+blaze_F1  <- 2*blaze_TP / (2*blaze_TP + blaze_FP + blaze_FN)
+# [1] 0.957896
+blaze_ACC <- (blaze_TP + blaze_TN) / total_n
+# [1] 0.9995369
+
+
+
+sockeye_TP <- sum(summarise_df[which(!is.na(summarise_df$tenX) & !is.na(summarise_df$Sockeye)), "n"])
+sockeye_TN <- sum(summarise_df[which( is.na(summarise_df$tenX) &  is.na(summarise_df$Sockeye)), "n"])
+sockeye_FP <- sum(summarise_df[which( is.na(summarise_df$tenX) & !is.na(summarise_df$Sockeye)), "n"])
+sockeye_FN <- sum(summarise_df[which(!is.na(summarise_df$tenX) &  is.na(summarise_df$Sockeye)), "n"])
+
+sockeye_TPR <- sockeye_TP / (sockeye_TP + sockeye_FP)
+# [1] 0.97225
+sockeye_FPR <- sockeye_FP / (sockeye_TP + sockeye_FP)
+# [1] 0.02775
+sockeye_TNR <- sockeye_TN / (sockeye_TN + sockeye_FN)
+# [1] 0.9996969
+sockeye_FNR <- sockeye_FN / (sockeye_TN + sockeye_FN)
+# [1] 0.0003031445
+sockeye_F1  <- 2*sockeye_TP / (2*sockeye_TP + sockeye_FP + sockeye_FN)
+# [1] 0.9589446
+sockeye_ACC <- (sockeye_TP + sockeye_TN) / total_n
+# [1] 0.9995478
+
+
+
