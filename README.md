@@ -168,6 +168,27 @@ scNanoGPS contains a script named “read_length_profiler.py” to compute the r
 ### FastQC (optional) <br />
 Per the experimental design of read architecture, the TruSeq Read1, cell barcode (CB), unique molecular identifier (UMI), and polyA tail are expected to locate either in the first or the last 100 nucleotide range of each Nanopore read.  Users can use FastQC to check the qualities of the first and last 100 nucleotides of individual Nanopore reads to draw the per-base quality score boxplot.
 
+  - Manual of prepare_read_qc.py
+    ```
+    Usage: prepare_read_qc.py [options]
+
+    Options:
+      -h, --help    show this help message and exit
+      -i FQ_F_NAME  File or folder name of reads.
+      -d O_DIR      Output directory name. Default: scNanoGPS_res
+      -l READ_LEN   Length of the extracted first and last read nucleotides.
+                    Default: 100
+      --o1=O1       First given length of reads. Default: first_tail.fastq.gz
+      --o2=O2       Last given length of reads. Default: last_tail.fastq.gz
+    ```
+
+  - Example code:
+    ```
+    python3 other_utils/prepare_read_qc.py -i example/fastq/
+    ```
+
+You can run FastQC to check first_tail.fastq.gz and last_tail.fastq.gz for quality score distribution.
+
 # Step 2: Scanner
 This step of scNanoGPS pipeline is executed by a python script called “scanner.py”. This script scans for both TruSeq Read1 and polyA tail of the reads. Scanning for other sequence modules are optional.
 To boost the scanning speed, we scan the first and last 100 nucleotides of reads to recognize TruSeq Read 1 and PolyA. Following by recognition, Scanner extracts CBs and UMIs which are neighbored by TruSeq Read 1 and Poly(A/T)n sequence blocks. Then the Scanner outputs two different files. One is a processed FastQ file holding the insert sequences without TruSeq Read 1, CB, and UMI sequences. The CBs of individual reads are moved to the read names as tags.  The other file is table named, “barcode_list.tsv”, storing reads information including read names, CBs, UMIs, and others.
@@ -235,6 +256,7 @@ To boost the scanning speed, we scan the first and last 100 nucleotides of reads
 This step of scNanoGPS pipeline is executed by a python script called “assigner.py”. This script is designed for CB collapsing and estimation of the optimal CB number without guidance of 10X short-read sequencing data or any CB whitelist.
 To estimate the number of optimal CB, we use edge detection strategy to find out the point where has dramatical signal dropping (Fig. 1b). The detailed method is that the assigner first calculates the supporting UMI number to every CB, and sorts the CB list by UMI number in decreasing order. Following by computing the partial derivatives (slopes) per CB in log10 scale, the medium number of slope changes in log10 scale are computed per 0.001 log10 tick. Then the maximal medium log10 slope change is selected, and where is the crude anchoring for following processes. To fathom the fully signal dropping point and include more useful CBs, we allow 10% more signal in log10 scale.
 Next, the script collapses CBs which have similar sequences. Previous study shows that the most accurate criterial for CB and UMI collapsing in Illumina samples are three and two Levenshtein Distance (LD), respectively. Here we use two LD to merge similar CB as Refinery Local Optimization. Then a list of representative CB having sufficient supporting read is generated.
+Alternatively, you can forcely assign cell barcode number by using "forced_no" parameter.
 
 - Manual of assigner.py
   ```
@@ -248,6 +270,7 @@ Next, the script collapses CBs which have similar sequences. Previous study show
     -o OUTPUT             Cell barcode counting file name. Default:
                           CB_counting.tsv.gz
     -d O_DIR              Output directory name. Default: scNanoGPS_res
+    --tmp_dir=TMP_DIR     Temporary folder name. Default: tmp
     -t NCORES             Number of cores for program running. Default: 1
     --log=LOG_F_NAME      Log file name. Default: assigner.log.txt
     --lCB=BC_LEN          Length of cell barcode. Default: 16
@@ -264,11 +287,22 @@ Next, the script collapses CBs which have similar sequences. Previous study show
                           barcodes. Default: CB_merged_dist.tsv.gz
     --CB_mrg_o=CB_MRG_O   File name for merged cell barcodes. Default:
                           CB_merged_list.tsv.gz
+    --forced_no=FORCED_NO
+                          Assign cell number in force. If this parameter is
+                          assigned, the raw CB with given number will be
+                          outputed without correction. Default: 0
+    --min_cellno=MIN_CELLNO
+                          Minimal cell number. Default: 1
+    --smooth_res=SMOOTH_RES
+                          Smoothening resolution on log10 scale. Default: 0.001
   ```
 
 - Example code:
   ```
   python3 assigner.py -t 2
+
+  # To generate raw matrix similar to 10X for SoupX, you can try forcedly assign cell number to 20000
+  python3 assigner.py -t 2 --forced_no 20000
   ```
 
 # Step 4: Curator
@@ -304,16 +338,24 @@ The master FastQ file of all cells is demultiplexed according to the true CB lis
     --keep_meta=KEEP_META
                           Set it to 1 to keep meta data, e.g. sam files, for futher checking.
                           Default: None
+    --inc_bed=INC_BED     Include specific regions (BED) in file. Default: None
+    --exc_bed=EXC_BED     Exclude specific regions (BED) in file. Default: None
     --softclipping_thr=SOFTCLIPPING_THR
                           Threshold for softclipping. Default: 0.8
     --minimap2=MINIMAP2   Path to minimap2. Default: minimap2
     --samtools=SAMTOOLS   Path to samtools. Default: samtools
     --spoa=SPOA           Path to spoa. Default: spoa
+    --skip_curation=SKIP_CURATION
+                          Set to 1 to skip UMI collaping and consensus sequence
+                          generating. Default: None
   ```
 
 - Example code:
   ```
   python3 curator.py -t 2 --ref_genome example/GRCh38_chr22.fa.gz --idx_genome example/GRCh38_chr22.mmi
+
+  # To generate raw matrix similar to 10X for SoupX, you can generate data by skipping curation
+  python3 curator.py -t 2 --ref_genome example/GRCh38_chr22.fa.gz --idx_genome example/GRCh38_chr22.mmi --skip_curation 1
   ```
 
 # Step 5: Reporter
@@ -369,6 +411,7 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
     --tmp_dir=TMP_DIR    Temporary folder name. Default: tmp
     --CB_file=CB_FILE    File name for filtered barcode list. Default:
                          filtered_barcode_list.txt
+    --gtf=GTF            GTF file for obtaining transcript ID.
     --liqa_ref=LIQA_REF  * Required ! Reference of LIQA.
     -o O_NAME            Counting table name. Default: matrix_isoform.tsv
     --log=LOG_F_NAME     Log file name. Default: reporter_isoform.log.txt
@@ -441,6 +484,8 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
                           Operation of Annovar database. Default: gx,r,f,f,f
     --annovar_xref=ANNOVAR_XREF
                           Path to Omim xref. Default: None
+    --keep_meta=KEEP_META
+                          Keep meta files. Default: None
   ```
 
 - Example code for variant detection with LongShot and annotation with ANNOVAR (please make sure to include ANNOVAR in your path):
@@ -476,6 +521,7 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
                           Scanner log file name. Default: read_length.tsv.gz
     --CB_file=CB_FILE     File name for filtered barcode list. Default:
                           filtered_barcode_list.txt
+    --exp_tb=EXP_TB       Counting table name. Default: matrix.tsv
     --ref_genome=REF_GENOME
                           * Required ! File for reference genome.
     --gtf=GTF             * Required ! Genome annotation file GTF.
@@ -486,7 +532,7 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
 
 - Example code for generating final summary
   ```
-  python3 reporter_summary.py --ref_genome example/GRCh38_chr22.fa.gz --gtf example/GRCh38_chr22.gtf --qualimap path/to/qualimap_folder/qualimap
+  python3 reporter_summary.py --ref_genome example/GRCh38_chr22.fa.gz --gtf example/GRCh38_chr22.gtf
   ```
 
 - Example summary table
@@ -511,3 +557,4 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
   Intronic:                    70.2%
   Intergenic:                  15.89%
   ```
+

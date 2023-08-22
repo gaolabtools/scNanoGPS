@@ -205,3 +205,44 @@ def check_mapping_db(options):
 		return options.idx_genome
 	else:
 		return options.ref_genome
+
+def filter_bam_inc(fq_pref, options):
+	import os
+
+	if options.inc_bed:
+		cmd = options.samtools + " view -b -L " + options.inc_bed + " " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam -o " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.selected.bam"
+		os.system(cmd)
+
+		cmd = ""
+		if not options.keep_meta:
+			cmd += "cp "
+		else:
+			cmd += "mv "
+		cmd += os.path.join(options.tmp_dir, fq_pref) + ".minimap2.selected.bam " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam"
+		os.system(cmd)
+
+		cmd = options.samtools + " index " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam"
+		os.system(cmd)
+
+def filter_bam_exc(fq_pref, options):
+	import os
+
+	if options.exc_bed:
+		cmd = options.samtools + " view -b -L " + options.exc_bed + " " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam -o " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.selected.bam -U " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.unselected.bam"
+		os.system(cmd)
+
+		cmd = ""
+		if not options.keep_meta:
+			cmd += "cp "
+		else:
+			cmd += "mv "
+		cmd += os.path.join(options.tmp_dir, fq_pref) + ".minimap2.unselected.bam " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam"
+		os.system(cmd)
+
+		if not options.keep_meta:
+			cmd = "rm " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.selected.bam"
+			os.system(cmd)
+
+		cmd = options.samtools + " index " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam"
+		os.system(cmd)
+

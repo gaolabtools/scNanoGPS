@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import time, os, sys, glob, gzip, re, subprocess
+import time, os, sys, gzip, re, subprocess, glob
 import numpy as np
 import pandas as pd
 from optparse import OptionParser
@@ -27,6 +27,9 @@ parser.add_option("--read_len_f",  dest = "read_len_f",  nargs = 1, default = "r
 parser.add_option("--CB_file",     dest = "CB_file",     nargs = 1, default = "filtered_barcode_list.txt",
                   help = "File name for filtered barcode list. "
                          "Default: filtered_barcode_list.txt")
+parser.add_option("--exp_tb",      dest = "exp_tb",      nargs = 1, default = "matrix.tsv",
+                  help = "Counting table name. "
+                         "Default: matrix.tsv")
 parser.add_option("--ref_genome",  dest = "ref_genome",  nargs = 1, default = None,
                   help = "* Required ! "
                          "File for reference genome.")
@@ -45,6 +48,10 @@ parser.add_option("--qualimap",    dest = "qualimap",    nargs = 1, default = "q
 options, arguments = parser.parse_args()
 
 #===pre-check===
+options.exp_tb = os.path.join(options.o_dir, options.exp_tb)
+options.compression = None
+if options.exp_tb.endswith('.gz'):
+	options.compression = 'gzip'
 options.log_f_name = os.path.join(options.o_dir, options.log_f_name)
 
 termination = False
@@ -113,11 +120,11 @@ while True:
 	if match:
 		detecting_rate = float(match[1])
 
-	match = re.match("\tNumber of 3\'-adaptor located on the first 100 nt. region:\s+(\d+)", line)
+	match = re.match("\tNumber of 3\'-adaptor located on the read head region:\s+(\d+)", line)
 	if match:
 		pass_read_no  = int(match[1])
 
-	match = re.match("\tNumber of 3\'-adaptor located on the last  100 nt. region:\s+(\d+)", line)
+	match = re.match("\tNumber of 3\'-adaptor located on the read tail region:\s+(\d+)", line)
 	if match:
 		pass_read_no += int(match[1])
 fh.close()
@@ -205,6 +212,14 @@ out_msg, err_msg = proc.communicate()
 
 UMI_no = int(out_msg.decode("utf-8").rstrip())
 
+#===count mean & median expressed gene number===
+expr_df = pd.read_csv(options.exp_tb, header = 0, sep = '\t', skiprows =1, compression = options.compression)
+expr_list = list()
+for i in range(7, expr_df.shape[1]):
+	expr_list.append(sum(expr_df.iloc[:, i] > 0))
+expr_mean = np.mean(expr_list)
+expr_med  = np.median(expr_list)
+
 #===count median UMI number per cell===
 #cmd = options.samtools + " view " + os.path.join(options.tmp_dir, "master.bam") + \
 #      ' | cut -f1 | cut -d \'_\' -f2'
@@ -242,9 +257,9 @@ while True:
 	if match:
 		intergenic_ratio = float(match[1])
 
-	match = re.match("\s+overlapping exon \=\s+[\d,]+\s\(([\d\.]+)\%\)", line)
-	if match:
-		overlapping_exon_ratio = float(match[1])
+#	match = re.match("\s+overlapping exon \=\s+[\d,]+\s\(([\d\.]+)\%\)", line)
+#	if match:
+#		overlapping_exon_ratio = float(match[1])
 fh.close()
 print("Done.\n", flush = True)
 
@@ -259,19 +274,20 @@ logger.write("\n")
 logger.write("Median read length:          " + str(len_median) + "\n")
 logger.write("Mean read length:            " + str(len_mean) + "\n")
 logger.write("Maximal read length:         " + str(len_max) + "\n")
-logger.write("Median read quality:         " + str(qua_median) + "\n")
-logger.write("Mean read quality:           " + str(qua_mean) + "\n")
+logger.write("Median cell barcode quality: " + str(qua_median) + "\n")
+logger.write("Mean cell barcode quality:   " + str(qua_mean) + "\n")
 logger.write("\n")
 logger.write("Cell number:                 " + str(len(CB_list)) + "\n")
 logger.write("Raw reads per cell:          " + str(round(total_read_no / len(CB_list), 2)) + "\n")
 logger.write("UMI counts:                  " + str(UMI_no) + "\n")
-logger.write("Mean UMI counts per cell:    " + str(round(UMI_no / len(CB_list), 2)) + "\n")
 logger.write("Median UMI counts per cell:  " + str(median_umi_no) + "\n")
+logger.write("Mean UMI counts per cell:    " + str(round(UMI_no / len(CB_list), 2)) + "\n")
+logger.write("Median gene number:          " + str(expr_med) + "\n")
+logger.write("Mean gene number:            " + str(round(expr_mean, 2)) + "\n")
 logger.write("\n")
 logger.write("Exonic:                      " + str(exonic_ratio) + '%' + "\n")
 logger.write("Intronic:                    " + str(intronic_ratio) + '%' + "\n")
 logger.write("Intergenic:                  " + str(intergenic_ratio) + '%' + "\n")
-logger.write("Overlapping exon:            " + str(overlapping_exon_ratio) + '%' + "\n")
 
 logger.close()
 print("Done.\n", flush = True)

@@ -2,16 +2,16 @@ def getOptions():
 	from optparse import OptionParser
 
 	parser = OptionParser()
-	parser.add_option("--fq_name",  dest = "fq_name",  nargs = 1, default = "processed.fastq.gz",
+	parser.add_option("--fq_name",    dest = "fq_name",    nargs = 1, default = "processed.fastq.gz",
                           help = "Processed fastq file name. "
                                  "Default: processed.fastq.gz")
-	parser.add_option("-b",         dest = "BC_list", nargs = 1, default = "barcode_list.tsv.gz",
+	parser.add_option("-b",           dest = "BC_list",    nargs = 1, default = "barcode_list.tsv.gz",
                           help = "Output cell barcode list file. "
                                  "Default: barcode_list.tsv.gz")
-	parser.add_option("--CB_count", dest = "CB_count", nargs = 1, default = "CB_counting.tsv.gz",
+	parser.add_option("--CB_count",   dest = "CB_count",   nargs = 1, default = "CB_counting.tsv.gz",
                           help = "Cell barcode counting file name. "
                                  "Default: CB_counting.tsv.gz")
-	parser.add_option("--CB_list",  dest = "CB_list",  nargs = 1, default = "CB_merged_list.tsv.gz",
+	parser.add_option("--CB_list",    dest = "CB_list",    nargs = 1, default = "CB_merged_list.tsv.gz",
                           help = "File name for merged cell barcodes. "
                                  "Default: CB_merged_list.tsv.gz")
 	parser.add_option("--ref_genome", dest = "ref_genome", nargs = 1, default = None,
@@ -21,36 +21,45 @@ def getOptions():
                           help = "Path to the Minimap2 genome index. "
                                  "Program will use reference genome if no Minimap2 genome index given. "
                                  "Default: None")
-	parser.add_option("-d",         dest = "o_dir",   nargs = 1, default = "scNanoGPS_res",
+	parser.add_option("-d",           dest = "o_dir",      nargs = 1, default = "scNanoGPS_res",
                           help = "Output directory name. "
                                  "Default: scNanoGPS_res")
-	parser.add_option("--tmp_dir",  dest = "tmp_dir", nargs = 1, default = "tmp",
+	parser.add_option("--tmp_dir",    dest = "tmp_dir",    nargs = 1, default = "tmp",
                           help = "Temporary folder name. "
                                  "Default: tmp")
-	parser.add_option("-t",         dest = "ncores", nargs = 1, default = 1,
+	parser.add_option("-t",           dest = "ncores",     nargs = 1, default = 1,
                           help = "Number of cores for computing. "
-                                 "Default: 1")
-	parser.add_option("--log",      dest = "log_f_name", nargs = 1, default = "curator.log.txt",
+                                 "Default: 1", type = "int")
+	parser.add_option("--log",        dest = "log_f_name", nargs = 1, default = "curator.log.txt",
                           help = "Log file name. "
                                  "Default: curator.log.txt")
-	parser.add_option("--umi_ld",   dest = "umi_ld", nargs = 1, default = 2,
+	parser.add_option("--umi_ld",     dest = "umi_ld",     nargs = 1, default = 2,
                           help = "Levenshtein distance for merging UMI. "
                                  "Default: 2")
-	parser.add_option("--keep_meta", dest = "keep_meta", nargs = 1, default = None,
+	parser.add_option("--keep_meta",  dest = "keep_meta",  nargs = 1, default = None,
                           help = "Set it to 1 to keep meta data, e.g. sam files, for futher checking. "
+                                 "Default: None")
+	parser.add_option("--inc_bed",    dest = "inc_bed",    nargs = 1, default = None,
+                          help = "Include specific regions (BED) in file. "
+                                 "Default: None")
+	parser.add_option("--exc_bed",    dest = "exc_bed",    nargs = 1, default = None,
+                          help = "Exclude specific regions (BED) in file. "
                                  "Default: None")
 	parser.add_option("--softclipping_thr", dest = "softclipping_thr", nargs = 1, default = 0.8,
                           help = "Threshold for softclipping. "
                                  "Default: 0.8")
-	parser.add_option("--minimap2", dest = "minimap2", nargs = 1, default = "minimap2",
+	parser.add_option("--minimap2",   dest = "minimap2",   nargs = 1, default = "minimap2",
                           help = "Path to minimap2. "
                                  "Default: minimap2")
-	parser.add_option("--samtools", dest = "samtools", nargs = 1, default = "samtools",
+	parser.add_option("--samtools",   dest = "samtools",   nargs = 1, default = "samtools",
                           help = "Path to samtools. "
                                  "Default: samtools")
-	parser.add_option("--spoa",     dest = "spoa", nargs = 1, default = "spoa",
+	parser.add_option("--spoa",     dest = "spoa",         nargs = 1, default = "spoa",
                           help = "Path to spoa. "
                                  "Default: spoa")
+	parser.add_option("--skip_curation", dest = "skip_curation", nargs = 1, default = None,
+                          help = "Set to 1 to skip UMI collaping and consensus sequence generating. "
+                                 "Default: None")
 	return parser
 
 def precheck(parser, options):
@@ -79,9 +88,12 @@ def precheck(parser, options):
 	if not os.path.isfile(options.BC_list):
 		print("\nCannot find Barcode list: " + options.BC_list + "\n")
 		termination = True
-	if os.path.isdir(options.tmp_dir):
-		print("\nTemporary directory exist: " + options.tmp_dir)
-		termination = True
+#	if os.path.isdir(options.tmp_dir):
+#		print("\nTemporary directory exist: " + options.tmp_dir)
+#		termination = True
+	if not os.path.isdir(options.tmp_dir):
+		print("\nCreate new temporary folder: " + options.tmp_dir + "\n")
+		os.makedirs(options.tmp_dir)
 	if not options.ref_genome:
 		print("\nReference genome for minimap2 is required !\n")
 		termination = True
@@ -99,9 +111,6 @@ def precheck(parser, options):
 		parser.print_help()
 		sys.exit(1)
 
-	print("\nCreate new temporary folder: " + options.tmp_dir + "\n")
-	os.makedirs(options.tmp_dir)
-
 	#===output parameters===
 	with open(options.log_f_name, "wt") as logger:
 		logger.write("Starting time stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()) + "\n")
@@ -116,10 +125,14 @@ def precheck(parser, options):
 		logger.write("\tTemporary directory:        " + str(options.tmp_dir) + "\n")
 		logger.write("\tNumber of computer cores:   " + str(options.ncores) + "\n")
 		logger.write("\tLog file name:              " + str(options.log_f_name) + "\n")
+		logger.write("\tLD for merging UMI:         " + str(options.umi_ld) + "\n")
+		logger.write("\tIncludion region BED:       " + str(options.inc_bed) + "\n")
+		logger.write("\tExcludion region BED:       " + str(options.exc_bed) + "\n")
 		logger.write("\tThreshold for softclipping: " + str(options.softclipping_thr) + "\n")
 		logger.write("\tPath of minimap2:           " + str(options.minimap2) + "\n")
 		logger.write("\tPath of samtools:           " + str(options.samtools) + "\n")
 		logger.write("\tPath spoa:                  " + str(options.spoa) + "\n")
+		logger.write("\tSkip curation step:         " + str(options.skip_curation) + "\n")
 		logger.write("\n")
 
 	return parser, options

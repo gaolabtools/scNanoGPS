@@ -3,17 +3,20 @@ def getOptions():
 
 	parser = OptionParser()
 	parser.add_option("-i", dest = "input", nargs = 1, default = "barcode_list.tsv.gz",
-                	  help = "Cell barcode list file. Could be either in .tsv or .tsv.gz format. "
+                          help = "Cell barcode list file. Could be either in .tsv or .tsv.gz format. "
                                  "Default: barcode_list.tsv.gz")
 	parser.add_option("-o", dest = "output", nargs = 1, default = "CB_counting.tsv.gz",
-        	          help = "Cell barcode counting file name. "
-	                         "Default: CB_counting.tsv.gz")
+                          help = "Cell barcode counting file name. "
+                                 "Default: CB_counting.tsv.gz")
 	parser.add_option("-d", dest = "o_dir",  nargs = 1, default = "scNanoGPS_res",
                           help = "Output directory name. "
                                  "Default: scNanoGPS_res")
+	parser.add_option("--tmp_dir",  dest = "tmp_dir", nargs = 1, default = "tmp",
+                          help = "Temporary folder name. "
+                                 "Default: tmp")
 	parser.add_option("-t", dest = "ncores", nargs = 1, default = 1,
                           help = "Number of cores for program running. "
-                                 "Default: 1")
+                                 "Default: 1", type = "int")
 	parser.add_option("--log", dest = "log_f_name", nargs = 1, default = "assigner.log.txt",
                           help = "Log file name. "
                                  "Default: assigner.log.txt")
@@ -22,20 +25,30 @@ def getOptions():
                           help = "Length of cell barcode. "
                                  "Default: 16")
 	parser.add_option("--CB_no_ext", dest = "CB_no_ext", nargs = 1, default = 0.1,
-	                  help = "Increasing CB number on log scale. "
-	                         "Default: 0.1")
+                          help = "Increasing CB number on log scale. "
+                                 "Default: 0.1")
 	parser.add_option("--CB_log10_dist_o", dest = "CB_log10_dist_o", nargs = 1, default = "CB_log10_dist.png",
                           help = "File name used for plotting log10 UMI number distribution. "
                                  "Default: CB_log10_dist.png")
 	parser.add_option("--CB_mrg_thr",  dest = "CB_mrg_thr",  nargs = 1, default = 2,
-	                  help = "Threshold of distance for merging cell barcodes. "
-	                         "Default: 2")
+                          help = "Threshold of distance for merging cell barcodes. "
+                                 "Default: 2", type = "int")
 	parser.add_option("--CB_mrg_dist", dest = "CB_mrg_dist", nargs = 1, default = "CB_merged_dist.tsv.gz",
-	                  help = "File name for distance matrix of merging cell barcodes. "
-	                         "Default: CB_merged_dist.tsv.gz")
+                          help = "File name for distance matrix of merging cell barcodes. "
+                                 "Default: CB_merged_dist.tsv.gz")
 	parser.add_option("--CB_mrg_o",    dest = "CB_mrg_o",    nargs = 1, default = "CB_merged_list.tsv.gz",
-	                  help = "File name for merged cell barcodes. "
-	                         "Default: CB_merged_list.tsv.gz")
+                          help = "File name for merged cell barcodes. "
+                                 "Default: CB_merged_list.tsv.gz")
+	parser.add_option("--forced_no",   dest = "forced_no",   nargs = 1, default = 0, type = int,
+                          help = "Assign cell number in force. "
+                                 "If this parameter is assigned, the raw CB with given number will be outputed without correction. "
+                                 "Default: 0")
+	parser.add_option("--min_cellno",  dest = "min_cellno",  nargs = 1, default = 1, type = int,
+                          help = "Minimal cell number. "
+                                 "Default: 1")
+	parser.add_option("--smooth_res",  dest = "smooth_res",  nargs = 1, default = 0.001, type = float,
+                          help = "Smoothening resolution on log10 scale. "
+                                 "Default: 0.001")
 
 	return parser
 
@@ -49,6 +62,15 @@ def precheck(parser, options):
 	options.CB_mrg_o        = os.path.join(options.o_dir, options.CB_mrg_o)
 	options.log_f_name      = os.path.join(options.o_dir, options.log_f_name)
 
+	if not os.path.isdir(options.o_dir):
+		print("\nCannot find output dir: " + options.o_dir + " !\n")
+		parser.print_help()
+		sys.exit(1)
+
+	if not os.path.isdir(options.tmp_dir):
+		print("\nCreate new temporary folder: " + options.tmp_dir + "\n")
+		os.makedirs(options.tmp_dir)
+
 	if not options.input:
 		print("\nCannot find Cell barcode list file: " + options.input + " !\n")
 		parser.print_help()
@@ -59,20 +81,17 @@ def precheck(parser, options):
 		parser.print_help()
 		sys.exit(1)
 
-	if not os.path.isdir(options.o_dir):
-		print("\nCannot find output dir: " + options.o_dir + " !\n")
-		parser.print_help()
-		sys.exit(1)
-
 	options.i_compression           = None
 	options.o_compression           = None
 	options.CB_mrg_dist_compression = None
+	options.CB_mrg_dist_ff          = options.CB_mrg_dist
 
 	if options.input.endswith(".gz"):
 		options.i_compression = 'gzip'
 	if options.output.endswith(".gz"):
 		options.o_compression = 'gzip'
 	if options.CB_mrg_dist.endswith(".gz"):
+		options.CB_mrg_dist_ff = options.CB_mrg_dist.split(".gz")[0]
 		options.CB_mrg_dist_compression = 'gzip'
 
 	#===output parameters===

@@ -1,8 +1,6 @@
 #! /usr/bin/env python3
 
-import time, os, sys, glob, gzip
-import numpy as np
-import pandas as pd
+import time, os, sys, glob
 from optparse import OptionParser
 from scanner_core import misc
 from curator_core import curator_io
@@ -19,24 +17,24 @@ parser.add_option("--tmp_dir",       dest = "tmp_dir",       nargs = 1, default 
 parser.add_option("--gtf",           dest = "gtf",           nargs = 1, default = None,
                   help = "* Required ! "
                          "GTF file for expression calling. ")
-parser.add_option("-o",              dest = "o_name",        nargs = 1, default = "matrix.tsv",
+parser.add_option("-o",              dest = "o_name",        nargs = 1, default = "matrix_exon_usage.tsv",
                   help = "Counting table name. "
-                         "Default: matrix.tsv")
-parser.add_option("--log",           dest = "log_f_name",    nargs = 1, default = "reporter_expression.log.txt",
-                  help = "Log file name."
-                         "Default: reporter_expression.log.txt")
+                         "Default: matrix_exon_usage.tsv")
+parser.add_option("--log",           dest = "log_f_name",    nargs = 1, default = "reporter_exon_usage.log.txt",
+                  help = "Log file name. "
+                         "Default: reporter_exon_usage.log.txt")
 parser.add_option("-t",              dest = "ncores",        nargs = 1, default = 1,
                   help = "Number of cores for program running. "
-                         "Default: 1", type = "int")
-parser.add_option("--min_gene_no",   dest = "min_gene_no",   nargs = 1, default = 300,
-                  help = "Minimal number of gene per cell. "
-                         "Default: 300")
-parser.add_option("--sel_bc_o",      dest = "sel_bc_o",      nargs = 1, default = "filtered_barcode_list.txt",
-                  help = "Filtered cell barcode list. "
-                         "Default: filtered_barcode_list.txt")
+                         "Default: 1")
 parser.add_option("--featurecounts", dest = "featurecounts", nargs = 1, default = "featureCounts",
-                  help = "Path to featureCounts."
+                  help = "Path to featureCounts. "
                          "Default: featureCounts")
+parser.add_option("--strandness",    dest = "strandness",    nargs = 1, default = "2",
+                  help = "Strand of reads. Setting for featureCounts. "
+                         "Default is reversely stranded because scNanoGPS scans from 3'-adaptor. "
+                         "0 (unstranded), 1 (stranded) and 2 (reversely stranded). "
+                         "Default: 2")
+
 options, arguments = parser.parse_args()
 
 #===pre-check===
@@ -78,9 +76,11 @@ for bam_f in bam_list:
 	BC = split_f_name[len(split_f_name) - 1].split('.')
 	CB_list.append(BC[0])
 
-print("Generating expression count...", flush = True)
-cmd = options.featurecounts + " -L -T " + str(options.ncores) + \
-      " -t gene -g gene_id -f --extraAttributes gene_name" + \
+print("Generating exon usage matrix...", flush = True)
+
+cmd = options.featurecounts + " -L -O -T " + str(options.ncores) + \
+      " -t exon -g exon_id -f --extraAttributes gene_name,transcript_id,exon_number" + \
+      " -s " + options.strandness + \
       " -a " + options.gtf + \
       " -o " + os.path.join(options.o_dir, options.o_name)
 
@@ -103,38 +103,31 @@ oh.write(fh.readline())
 line_list = fh.readline().rstrip().split("\t")
 #---extract BC---
 BC_list = list()
-for i in line_list[7:]:
+for i in line_list[9:]:
 	line_list_list = i.split('.')
 	pre_BC = line_list_list[len(line_list_list) - 4].split('/')
 	BC_list.append(pre_BC[len(pre_BC) - 1])
-
 #---extract BC---
-mod_header_list = line_list[0:7] + BC_list
+oh.write("\t".join(line_list[0:7]) + "_" + line_list[7] + "_" + line_list[8] + "\t" + "\t".join(BC_list) + "\n")
+
+exon_dict = dict()
+while True:
+	line = fh.readline()
+	if not line:
+		break
+	line_list = line.split("\t")
+	if line_list[0] in exon_dict:
+		continue
+	else:
+		oh.write("\t".join(line_list[0:7]) + "_" + line_list[7] + "_exon_" + line_list[8] + "\t" + "\t".join(line_list[9:]))
+		exon_dict[line_list[0]] = 1
 oh.close()
 fh.close()
 
-#---filter cell barcodes by gene number---
-df = pd.read_table(os.path.join(options.o_dir, options.o_name), sep = '\t', header = None, names = mod_header_list, skiprows = 2)
-
-counting_list = np.repeat(options.min_gene_no, 7)
-
-for BC in mod_header_list[7:]:
-	bin_exp_list = [1 if x > 0 else 0 for x in df[BC]]
-	counting_list = np.append(counting_list, sum(bin_exp_list))
-
-res_df = df[df.columns.values[counting_list >= options.min_gene_no]].copy()
-
-res_df.to_csv(os.path.join(options.o_dir, options.o_name) + ".tmp", index = False, sep = '\t', mode = 'a')
-
 os.system("mv " + os.path.join(options.o_dir, options.o_name) + ".tmp " + os.path.join(options.o_dir, options.o_name))
 
-#===output filtered cell barcode list===
-with open(os.path.join(options.o_dir, options.sel_bc_o), "wt") as cbf:
-	for cb_name in df[df.columns.values[counting_list >= options.min_gene_no]].iloc[:, 7:]:
-		cbf.write(cb_name + "\n")
-
 print("\nFinished !\n")
-print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()) + "\n", flush = True)
+print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()), "\n", flush = True)
 hours, minutes, seconds = misc.get_time_elapse(start_time)
 misc.report_time_elapse(hours, minutes, seconds)
 

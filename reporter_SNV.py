@@ -2,7 +2,6 @@
 
 import time, os, sys, glob, gzip
 import multiprocessing as mp
-import numpy as np
 import pandas as pd
 from Bio import bgzf
 from functools import partial 
@@ -20,6 +19,11 @@ def poolcontext(*args, **kwargs):
 def proc_longshot(CB, options):
 	bam_pref = os.path.join(options.tmp_dir, CB)
 	vcf_pref = os.path.join(options.tmp_dir, options.longshot_o + '.' + CB)
+
+	#===skip if file exist===
+	if(os.path.isfile(vcf_pref + '.vcf') or os.path.isfile(vcf_pref + '.vcf.gz')):
+		print("Skip " + CB + ": " + vcf_pref + ".vcf exists")
+		return
 
 	longshot_time = time.time()
 	print('Longshot: Calling SNV in ' + CB + ' ...', flush = True)
@@ -45,8 +49,9 @@ def proc_longshot(CB, options):
 	os.system(cmd)
 
 	#---remove temp files---
-	cmd = 'rm ' + vcf_pref + '.vcf'
-	os.system(cmd)
+	if not options.keep_meta:
+		cmd = 'rm ' + vcf_pref + '.vcf'
+		os.system(cmd)
 
 	hours, minutes, seconds = misc.get_time_elapse(longshot_time)
 	print("Longshot spend %d:%d:%.2f on %s" % (hours, minutes, seconds, CB), flush = True)
@@ -87,10 +92,16 @@ def filter_by_prevalence(options):
 	options.counter_pass = counter_pass
 	options.counter_raw  = counter_raw
 
-	cmd = 'rm ' + os.path.join(options.o_dir, options.o_pref) + '.raw.vcf.gz'
-	os.system(cmd)
+	if not options.keep_meta:
+		cmd = 'rm ' + os.path.join(options.o_dir, options.o_pref) + '.raw.vcf.gz'
+		os.system(cmd)
 
 def merge_longshot(CB_list, options):
+	#===skip if file exist===
+	if os.path.isfile(os.path.join(options.o_dir, options.o_pref) + '.filtered.vcf.gz'):
+		print("Skip merging longshot result: " + os.path.join(options.o_dir, options.o_pref) + ".filtered.vcf.gz exists")
+		return
+
 	cmd = 'ls ' + os.path.join(options.tmp_dir, options.longshot_o) + \
 	      '.*.vcf.gz | split -l 500 - ' + \
 	      os.path.join(options.tmp_dir, 'splitted_vcf_list_')
@@ -159,8 +170,14 @@ def compute_read_no(CB, options):
 	mpileup_time = time.time()
 	print('Processing ' + CB + ' ...', flush = True)
 
+	#===skip if file exist===
+	if os.path.isfile(os.path.join(options.tmp_dir, CB) + '.mpileup'):
+		print("Skip " + CB + ": " + os.path.join(options.tmp_dir, CB) + ".mpileup exists")
+		return
+
 	cmd = options.samtools + ' mpileup ' + os.path.join(options.tmp_dir, CB) + '.curated.minimap2.bam' + \
 	      ' --reference ' + options.ref_genome + ' -l ' + os.path.join(options.o_dir, options.o_snv_l) + \
+	      ' --no-output-ins --no-output-ins --no-output-del --no-output-del' + \
 	      ' -Q ' + options.min_read_quality + ' -o ' + os.path.join(options.tmp_dir, CB) + '.mpileup'
 	os.system(cmd)
 
@@ -201,6 +218,7 @@ def merge_mpileup(CB_list, options):
 		dp_df['POS'] = dp_df['POS'].apply(str)
 
 		dp_df = dp_df.merge(pileup_df.loc[:, ['CHROM', 'POS', 'ALT']], how = 'left', on = ['CHROM', 'POS'])
+
 		dp_df[CB] = ""
 
 		dp_df['REF_no'] = dp_df['MATCH'].str.count("[\.\,]")
@@ -217,10 +235,26 @@ def merge_mpileup(CB_list, options):
 			dp_df.loc[idx, CB] = dp_str
 
 		pileup_df = pileup_df.merge(dp_df.loc[:, ['CHROM', 'POS', 'REF', 'ALT', CB]], how = 'left', on = ['CHROM', 'POS', 'REF', 'ALT'], )
-		pileup_df[CB] = pileup_df[CB].fillna('0/0')
 
-		cmd = 'rm ' + os.path.join(options.tmp_dir, CB) + '.mpileup'
-		os.system(cmd)
+		if not options.keep_meta:
+			cmd = 'rm ' + os.path.join(options.tmp_dir, CB) + '.mpileup'
+			os.system(cmd)
+
+	#===separate rows having multiple ALT===
+	pileup_sinalt_df = pileup_df.loc[~pileup_df.ALT.str.contains(',')]
+	pileup_mulalt_df = pileup_df.loc[ pileup_df.ALT.str.contains(',')]
+
+	#=== fill na ===
+		#---singular ATL---
+	pileup_sinalt_df = pileup_sinalt_df.fillna('0/0')
+
+		#---multiple ALT---
+	for i in range(0, pileup_mulalt_df.shape[0]):
+		na_str = "0" + "/0" * (pileup_mulalt_df.iloc[i, :].ALT.count(",") + 1)
+		pileup_mulalt_df.iloc[i, :].fillna(na_str, inplace = True)
+
+	#=== merge back ===
+	pileup_df = pd.concat([pileup_sinalt_df, pileup_mulalt_df]).sort_values(["CHROM", "POS"]).reset_index(drop = True)
 
 	pileup_df.to_csv(os.path.join(options.o_dir, options.o_snv_dp), sep = '\t', header = True, index = False, compression = 'gzip')
 
@@ -264,8 +298,14 @@ def correct_vcf(options, pileup_df):
 	oh.close()
 	fh.close()
 
-	cmd = 'rm ' + os.path.join(options.o_dir, options.o_pref) + '.filtered.vcf.gz'
+	cmd = options.tabix + ' -p vcf ' + os.path.join(options.o_dir, options.o_name) + ' &> /dev/null'
 	os.system(cmd)
+
+	if not options.keep_meta:
+		cmd = 'rm ' + os.path.join(options.o_dir, options.o_pref) + '.filtered.vcf.gz'
+		os.system(cmd)
+		cmd = 'rm ' + os.path.join(options.o_dir, options.o_pref) + '.filtered.vcf.gz.tbi'
+		os.system(cmd)
 
 	return
 
@@ -364,6 +404,9 @@ if __name__ == "__main__":
 	parser.add_option("--annovar_xref", dest = "annovar_xref", nargs = 1, default = None,
                           help = "Path to Omim xref. "
                                  "Default: None")
+	parser.add_option("--keep_meta",    dest = "keep_meta",    nargs = 1, default = None,
+                          help = "Keep meta files. "
+                                 "Default: None")
 	options, arguments = parser.parse_args()
 
 	#===pre-check===
@@ -451,6 +494,15 @@ if __name__ == "__main__":
 	if options.run_annovar:
 		logger.write("Path to Annovar:       " + options.annovar + "\n")
 	logger.close()
+
+	#=== set env variables
+	os.environ["OMP_NUM_THREADS"]        = str(options.ncores)
+	os.environ["OPENBLAS_NUM_THREADS"]   = str(options.ncores)
+	os.environ["MKL_NUM_THREADS"]        = str(options.ncores)
+	os.environ["VECLIB_MAXIMUM_THREADS"] = str(options.ncores)
+	os.environ["NUMEXPR_NUM_THREADS"]    = str(options.ncores)
+
+	import numpy as np
 
 	print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()), "\n", flush = True)
 	#===load CB list===

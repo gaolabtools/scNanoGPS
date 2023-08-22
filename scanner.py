@@ -21,6 +21,15 @@ if __name__ == "__main__":
 	#===precheck===
 	parser, options, arguments, counter = preprocessing.precheck(parser, options, arguments)
 
+	#=== set env variables
+	os.environ["OMP_NUM_THREADS"]        = str(options.ncores)
+	os.environ["OPENBLAS_NUM_THREADS"]   = str(options.ncores)
+	os.environ["MKL_NUM_THREADS"]        = str(options.ncores)
+	os.environ["VECLIB_MAXIMUM_THREADS"] = str(options.ncores)
+	os.environ["NUMEXPR_NUM_THREADS"]    = str(options.ncores)
+
+	import numpy as np
+
 	#===parameters===
 	#---CB list col names---
 	df_col = ['rid', 'orientation', 'BC_start', 'BC', 'UMI', 'Seq_end', 'mean_BC_quality']

@@ -18,19 +18,51 @@ def poolcontext(*args, **kwargs):
 def proc_liqa(CB, options):
 	bam_pref = os.path.join(options.tmp_dir, CB)
 
-	liqa_time = time.time()
-	print("LIQA: Calling isoform in " + CB + '...', flush = True)
-	cmd = options.liqa + ' -task quantify -max_distance 20 -f_weight 1' + \
-	      ' -refgene ' + options.liqa_ref + \
-	      ' -bam ' + bam_pref + '.curated.minimap2.bam' + \
-	      ' -out ' + bam_pref + options.liqa_o
+	if os.path.isfile(os.path.join(bam_pref + options.liqa_o)):
+		print("LIQA output exist !!! Skip LIQA on " + CB + "!!!")
+	else:
+		liqa_time = time.time()
+		print("LIQA: Calling isoform in " + CB + '...', flush = True)
+		cmd = options.liqa + ' -task quantify -max_distance 20 -f_weight 1' + \
+		      ' -refgene ' + options.liqa_ref + \
+		      ' -bam ' + bam_pref + '.curated.minimap2.bam' + \
+		      ' -out ' + bam_pref + options.liqa_o
 
-	code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
-	with open(bam_pref + options.liqa_log, "wt") as fh:
-		fh.write(out_msg.decode("utf-8"))
-		fh.write(err_msg.decode("utf-8"))
-	hours, minutes, seconds = misc.get_time_elapse(liqa_time)
-	print("LIQA spend %d:%d:%.2f on %s" % (hours, minutes, seconds, CB), flush = True)
+		code_msg, out_msg, err_msg = curator_io.sys_run(cmd)
+		with open(bam_pref + options.liqa_log, "wt") as fh:
+			fh.write(out_msg.decode("utf-8"))
+			fh.write(err_msg.decode("utf-8"))
+		hours, minutes, seconds = misc.get_time_elapse(liqa_time)
+		print("LIQA spend %d:%d:%.2f on %s" % (hours, minutes, seconds, CB), flush = True)
+
+def parse_txid2txname(options):
+	tx_mapping = {}
+	fh = open(options.gtf, "rt")
+	while True:
+		line = fh.readline()
+		if not line:
+			break
+
+		if line.startswith("#"):
+			continue
+
+		line_list = line.rstrip().split("\t")
+		if line_list[2] != "transcript":
+			continue
+
+		attr_list = line_list[8].split('; ')
+		txid, txname = "", ""
+		for x in attr_list:
+			ele_list = x.split(' ')
+			if ele_list[0] == "transcript_id":
+				txid   = ele_list[1].split('"')[1]
+			if ele_list[0] == "transcript_name":
+				txname = ele_list[1].split('"')[1]
+
+		tx_mapping.update({txid: txname})
+	fh.close()
+
+	return tx_mapping
 
 if __name__ == "__main__":
 
@@ -46,6 +78,8 @@ if __name__ == "__main__":
 	parser.add_option("--CB_file",  dest = "CB_file",    nargs = 1, default = "filtered_barcode_list.txt",
                           help = "File name for filtered barcode list. "
                                  "Default: filtered_barcode_list.txt")
+	parser.add_option("--gtf",      dest = "gtf",        nargs = 1, default = None,
+                          help = "GTF file for obtaining transcript ID. ")
 	parser.add_option("--liqa_ref", dest = "liqa_ref",   nargs = 1, default = None,
 	                  help = "* Required ! "
 	                         "Reference of LIQA. ")
@@ -57,7 +91,7 @@ if __name__ == "__main__":
 	                         "Default: reporter_isoform.log.txt")
 	parser.add_option("-t",         dest = "ncores",     nargs = 1, default = 1,
 	                  help = "Number of cores for program running. "
-	                         "Default: 1")
+	                         "Default: 1", type = "int")
 	parser.add_option("--liqa",     dest = "liqa",       nargs = 1, default = "liqa",
 	                  help = "Program name of LIQA. "
 	                         "Default: liqa")
@@ -103,6 +137,15 @@ if __name__ == "__main__":
 	logger.write("Reference of LIQA:   " + options.liqa_ref + "\n")
 	logger.close()
 
+	#=== set env variables
+	os.environ["OMP_NUM_THREADS"]        = str(options.ncores)
+	os.environ["OPENBLAS_NUM_THREADS"]   = str(options.ncores)
+	os.environ["MKL_NUM_THREADS"]        = str(options.ncores)
+	os.environ["VECLIB_MAXIMUM_THREADS"] = str(options.ncores)
+	os.environ["NUMEXPR_NUM_THREADS"]    = str(options.ncores)
+
+	import numpy as np
+
 	start_time = time.time()
 	print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()), "\n", flush = True)
 	#===load CB list===
@@ -123,8 +166,14 @@ if __name__ == "__main__":
 				CB_list.append(CB_name)
 		bam_list = [x + ".curated.minimap2.bam" for x in CB_list]
 
+	#===parse transcript ID===
+	if options.gtf:
+		print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()), "\n", flush = True)
+		print("Parsing GTF...", flush = True)
+		options.tx_mapping = parse_txid2txname(options)
+
 	#===compute isoform===
-	with poolcontext(processes = int(options.ncores)) as pool:
+	with poolcontext(processes = options.ncores) as pool:
 		pool.map(partial(proc_liqa, options = options), CB_list)
 
 	print("\nBatch LIQA jobs finished !\n")
@@ -136,10 +185,10 @@ if __name__ == "__main__":
 	logger.write("\nBatch LIQA spends %d : %d : %.2f\n" % (hours, minutes, seconds))
 	logger.close()
 
-
 	#===parse & combine results===
 	res_tb = dict()
 	for CB in CB_list:
+		res_tb.update({CB: {}})
 		fh = open(os.path.join(options.tmp_dir, CB) + options.liqa_o, "rt")
 		#---skip def line---
 		fh.readline()
@@ -148,10 +197,10 @@ if __name__ == "__main__":
 			if not line:
 				break
 			line_list = line.split("\t")
-			if CB in res_tb:
-				res_tb[CB][line_list[0] + '_' + line_list[1]] = line_list[2]
+			if options.gtf:
+				res_tb[CB].update({options.tx_mapping[line_list[1]] + '_' + line_list[1]: line_list[2]})
 			else:
-				res_tb[CB] = dict()
+				res_tb[CB].update({line_list[0] + '_' + line_list[1]: line_list[2]})
 		fh.close()
 
 	pd.DataFrame(res_tb).to_csv(os.path.join(options.o_dir, options.o_name), sep='\t', na_rep = 0.0, header = True, index = True)
