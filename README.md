@@ -4,7 +4,7 @@ scNanoGPS is a computational toolkit for analyzing high throughput single cell n
 # Keywords
 Single cell, Nanopore, RNA sequencing, long read, cell barcode demultiplex, UMI curation, gene expression, isoform, single nucleotide variation
 
-# Citation
+# Citing scNanoGPS
 Shiau, CK., Lu, L., Kieser, R. et al. High throughput single cell long-read sequencing analyses of same-cell genotypes and phenotypes in human tumors. Nat Commun 14, 4124 (2023). https://doi.org/10.1038/s41467-023-39813-7
 
 # Index
