@@ -251,7 +251,7 @@ def merge_mpileup(CB_list, options):
 		#---multiple ALT---
 	for i in range(0, pileup_mulalt_df.shape[0]):
 		na_str = "0" + "/0" * (pileup_mulalt_df.iloc[i, :].ALT.count(",") + 1)
-		pileup_mulalt_df.iloc[i, :].fillna(na_str, inplace = True)
+		pileup_mulalt_df.iloc[i, :] = pileup_mulalt_df.iloc[i, :].fillna(na_str)
 
 	#=== merge back ===
 	pileup_df = pd.concat([pileup_sinalt_df, pileup_mulalt_df]).sort_values(["CHROM", "POS"]).reset_index(drop = True)
