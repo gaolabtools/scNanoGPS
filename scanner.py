@@ -63,8 +63,6 @@ if __name__ == "__main__":
 		batch_data = []
 		res_data   = []
 		batch_data, eof, rid, reader, f_idx = scanner_io.batch_reading(reader, f_list, f_idx, int(options.batch_no), rid)
-		if eof == 1:
-			break
 
 		with poolcontext(processes = options.ncores) as pool:
 			tmp_data = pool.map(partial(searching_core.ten_nano_workflow, options = options), batch_data)
@@ -84,6 +82,9 @@ if __name__ == "__main__":
 				if each_row[1]:
 					BC_output.write("\t".join(str(x) for x in each_row) + "\n")
 					scanner_io.output_fastq(writer, each_row, each_data)
+
+		if eof == 1:
+			break
 
 	reader.close()
 	writer.close()
