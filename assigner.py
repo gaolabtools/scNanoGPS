@@ -78,6 +78,7 @@ if __name__ == "__main__":
 
 		#===Calc distance===
 		print("Computing Levenshtein distance", flush = True)
+		step_time = time.time()
 
 # mrg_sel:
 #          idx                BC
@@ -108,6 +109,9 @@ if __name__ == "__main__":
 
 		with poolcontext(processes = options.ncores) as pool:
 			pool.map(partial(wrapping.batch_seq_comp, target = mrg_sel, options = options), queries)
+
+		hours, minutes, seconds = misc.get_time_elapse(step_time)
+		misc.report_time_elapse(hours, minutes, seconds)
 
 		#===merging CB===
 		step_time = time.time()
