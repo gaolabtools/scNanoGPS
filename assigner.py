@@ -104,7 +104,7 @@ if __name__ == "__main__":
 		if options.bclist:
 			true_BCs = pd.read_table(options.bclist, header=None)
 			true_BCs = set(true_BCs[0].values)
-			mrg_sel = mrg_sel.loc[[not bc in true_BCs for bc in mrg_sel["BC"].values]].copy()
+			mrg_sel = mrg_sel.loc[[not bc in true_BCs for bc in mrg_sel["BC"].values]]
 
 		with poolcontext(processes = options.ncores) as pool:
 			pool.map(partial(wrapping.batch_seq_comp, target = mrg_sel, options = options), queries)

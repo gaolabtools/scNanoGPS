@@ -80,6 +80,9 @@ def batch_seq_comp(query, target, options):
 	                    (target["BC_7to15"].values == num_8to16) |
 	                    (target["BC_8to16"].values == num_7to15)]
 
+	if len(target) == 0:
+		return 1
+
 	target.loc[:, "id1"]      = query[0]
 	target.loc[:, "BC1"]      = query[1]
 	target.loc[:, "distance"] = target["BC"].apply(lambda x: Levenshtein.distance(x, query[1], weights=(1,1,2)))
