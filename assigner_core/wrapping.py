@@ -84,12 +84,18 @@ def batch_seq_comp(query, target, options):
 		return 1
 
 	target.loc[:, "id1"]      = query[0]
-	target.loc[:, "BC1"]      = query[1]
 	target.loc[:, "distance"] = target["BC"].apply(lambda x: Levenshtein.distance(x, query[1], weights=(1,1,2)))
 
 	tmp_f = os.path.join(options.tmp_dir, "assigner_tmp_") + str(query[0]) + ".tsv"
 
-	target.loc[(target["distance"].values == 2), ["id1", "idx", "distance"]].to_csv(tmp_f, header = None, index = None, sep = "\t")
+	hits = target.loc[(target["distance"].values == 2)]
+	# its a ins followed by del (or other way around) if start and end match but no S and adding the first or last bp does not improve distance
+	ins2del = hits["BC"].apply(lambda x: (x[0] == query[1][0]) & (x[-1] == query[1][-1]) & \
+	                                     (Levenshtein.distance(x, query[1], weights=(1,1,1)) > 1) & \
+	                                     (Levenshtein.distance(x + query[1][-1], query[1], weights=(1,1,2)) > 1) & \
+	                                     (Levenshtein.distance(query[1][0] + x, query[1], weights=(1,1,2)) > 1))
+
+	hits.loc[~ins2del, ["id1", "idx", "distance"]].to_csv(tmp_f, header = None, index = None, sep = "\t")
 
 	return 1
 
