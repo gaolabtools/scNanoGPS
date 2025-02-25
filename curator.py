@@ -39,6 +39,7 @@ if __name__ == "__main__":
 	print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()), "\n", flush = True)
 	print("Loading CB_counting: " + options.CB_count + " ...", end = "", flush = True)
 	CB_counting_df = curator_io.load_df(options.CB_count)
+	CB_counting_df.set_index('idx', inplace=True)
 	print("Done", flush = True)
 
 	#===load CB_list===
@@ -48,20 +49,16 @@ if __name__ == "__main__":
 	CB_list = curator_io.open_file(options.CB_list, "rt")
 	#---skip def line---
 	CB_list.readline()
-	while True:
-		line = CB_list.readline()
-		if not line:
-			break
-
+	for line in CB_list:
 		lines = line.rstrip().split(": ")
 
-		rep_BC = CB_counting_df.loc[CB_counting_df['idx'] == int(lines[0]), ['BC']].values[0][0]
+		rep_BC = CB_counting_df.loc[int(lines[0]), 'BC']
 
 		all_id = curator_io.extract_id_list(lines[1])
 
-		BC_seq_list = CB_counting_df.loc[CB_counting_df['idx'].isin(all_id), ['BC']]
+		BC_seq_list = CB_counting_df.loc[all_id, 'BC']
 		for ele in BC_seq_list.values:
-			CB_dict[ele[0]] = rep_BC
+			CB_dict[ele] = rep_BC
 
 	CB_list.close()
 	print("Done", flush = True)

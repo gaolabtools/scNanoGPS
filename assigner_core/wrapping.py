@@ -61,10 +61,7 @@ def estimate_rescue_cell_no(df):
 	return est_rescue_CB_no
 
 def batch_seq_comp(query, target, options):
-	import time, distance, os
-
-	print("Calculating Levenshtein distance on " + str(query[0]) + ": " + query[1] + " ...")
-	start_time = time.time()
+	import time, Levenshtein, os
 
 # target:
 #          idx                BC
@@ -73,20 +70,32 @@ def batch_seq_comp(query, target, options):
 
 	target = target.loc[target["idx"] > query[0], :].copy()
 
+	### prematching based on substrings -> only calculate distance to partial matches
+	num_1to8 = dna_to_int(query[1][:8])
+	num_8to16 = dna_to_int(query[1][8:])
+	num_7to15 = dna_to_int(query[1][7:15])
+
+	target = target.loc[(target["BC_1to8"].values == num_1to8) |
+	                    (target["BC_8to16"].values == num_8to16) |
+	                    (target["BC_7to15"].values == num_8to16) |
+	                    (target["BC_8to16"].values == num_7to15)]
+
+	if len(target) == 0:
+		return 1
+
 	target.loc[:, "id1"]      = query[0]
-	target.loc[:, "BC1"]      = query[1]
-	target.loc[:, "distance"] = target.apply(lambda x: distance.levenshtein(x["BC"], x["BC1"]), axis = 1)
+	target.loc[:, "distance"] = target["BC"].apply(lambda x: Levenshtein.distance(x, query[1], weights=(1,1,2)))
 
 	tmp_f = os.path.join(options.tmp_dir, "assigner_tmp_") + str(query[0]) + ".tsv"
 
-	target.loc[target["distance"] <= options.CB_mrg_thr, ["id1", "idx", "distance"]].to_csv(tmp_f, header = None, index = None, sep = "\t")
+	hits = target.loc[(target["distance"].values == 2)]
+	# its a ins followed by del (or other way around) if start and end match but no S and adding the first or last bp does not improve distance
+	ins2del = hits["BC"].apply(lambda x: (x[0] == query[1][0]) & (x[-1] == query[1][-1]) & \
+	                                     (Levenshtein.distance(x, query[1], weights=(1,1,1)) > 1) & \
+	                                     (Levenshtein.distance(x + query[1][-1], query[1], weights=(1,1,2)) > 1) & \
+	                                     (Levenshtein.distance(query[1][0] + x, query[1], weights=(1,1,2)) > 1))
 
-	time_elapse = time.time() - start_time
-	hours   = time_elapse // 3600
-	rest_t  = time_elapse % 3600
-	minutes = rest_t // 60
-	seconds = rest_t % 60
-	print("Calc. LD on " + query[1] + " spent %d : %d : %.2f" % (hours, minutes, seconds))
+	hits.loc[~ins2del, ["id1", "idx", "distance"]].to_csv(tmp_f, header = None, index = None, sep = "\t")
 
 	return 1
 
@@ -95,7 +104,7 @@ def seq_comp(batch_data, options):
 
 	return [batch_data['id1'], batch_data['id2'], distance.levenshtein(batch_data['BC1'], batch_data['BC2'])]
 
-def merge_cb_new(mrg_sel, options):
+def merge_cb_new(BC_index, options):
 	import pandas as pd
 	import os
 
@@ -115,11 +124,15 @@ def merge_cb_new(mrg_sel, options):
 	dist_df = pd.read_csv(options.CB_mrg_dist, sep = "\t", header = 0, compression = options.CB_mrg_dist_compression)
 
 	res = dict()
-	for idx in mrg_sel['idx']:
+	for idx in BC_index:
 		res[str(idx)] = str(idx)
 
 	for idx, row in dist_df.iterrows():
 		res[str(row['id2'])] = res[str(row['id1'])]
+
+	# remove those barcodes that are at equal distance to two other barcodes (not sure if this happends but still)
+	for idx in dist_df.id2.value_counts()[dist_df.id2.value_counts() > 1].index.tolist():
+		res.pop(str(idx))
 
 	return pd.DataFrame.from_dict(res, orient = 'index').reset_index().rename(columns = {'index': 'id1', 0: 'id2'})
 
@@ -139,3 +152,44 @@ def merge_cb(mrg_sel, dist_df, mrg_dist):
 
 	return res_df
 
+def dna_to_int(dna_sequence):
+	"""
+	Convert a DNA sequence of length 8 to a 16-bit integer.
+
+	Each nucleotide is represented by 2 bits:
+	A -> 00 (0)
+	C -> 01 (1)
+	T -> 10 (2)
+	G -> 11 (3)
+
+	Args:
+		dna_sequence (str): DNA sequence string of length 8
+
+	Returns:
+		int: 16-bit integer representation
+
+	Raises:
+		ValueError: If sequence contains non ACGT character
+		ValueError: If sequence length isn't 8 or contains invalid characters
+	"""
+	# Validate input
+	if len(dna_sequence) != 8:
+		raise ValueError(f"DNA sequence must be exactly 8 characters long")
+
+	valid_nucleotides = set('ACTG')
+	if not all(nuc in valid_nucleotides for nuc in dna_sequence):
+		raise ValueError(f"Invalid nucleotide found. Must only contain ACTG")
+
+	# Convert nucleotides to binary values
+	nucleotide_values = {'A': 0, 'C': 1, 'T': 2, 'G': 3}
+
+	# Initialize result
+	result = 0
+
+	# Process each nucleotide
+	for i, nucleotide in enumerate(reversed(dna_sequence)):
+		value = nucleotide_values[nucleotide]
+		position = i * 2  # Each nucleotide takes 2 bits
+		result |= value << position
+
+	return result

@@ -73,24 +73,51 @@ if __name__ == "__main__":
 	if options.forced_no == 0:
 		#===select CB having read no. passing threshold===
 		print("Preparing CB table...", flush = True)
-		mrg_sel = UMI_df.loc[UMI_df['idx'] <= cell_no_ext, ['idx', 'BC']].sort_values('idx', ascending = True).reset_index(drop = True)
+		mrg_sel = UMI_df.loc[:, ['idx', 'BC']].sort_values('idx', ascending = True).reset_index(drop = True)
 		print("Done", flush = True)
 
 		#===Calc distance===
 		print("Computing Levenshtein distance", flush = True)
+		step_time = time.time()
 
 # mrg_sel:
 #          idx                BC
 # 0          1  CTACGAAGTGATGAGG
 # 1          2  TTGTGCCTCATTGACA
 
+		# accelerate assignment by only checking BCs that partially match
+		# do check on 16 bit ints
+		mrg_sel['BC_1to8'] = mrg_sel['BC'].str.slice(stop=8).apply(wrapping.dna_to_int) # edit in second half
+		mrg_sel['BC_8to16'] = mrg_sel['BC'].str.slice(start=8).apply(wrapping.dna_to_int) # S or I in first half
+		mrg_sel['BC_7to15'] = mrg_sel['BC'].str.slice(start=7, stop=15).apply(wrapping.dna_to_int) # D in first half
+
+		### select BCs based on a file of previously defined barcodes
+		if options.srl:
+			defined_BCs = pd.read_table(options.srl, header=None)
+			defined_BCs = set(defined_BCs[0].values)
+
+			queries = mrg_sel.iloc[0:(mrg_sel.shape[0] - 1)].values.tolist()
+			queries = [q for q in queries if q[1] in defined_BCs]
+
+		else:
+			queries = mrg_sel.iloc[0:(mrg_sel.shape[0] - 1)].values.tolist()[:cell_no_ext]
+
+		if options.bclist:
+			true_BCs = pd.read_table(options.bclist, header=None)
+			true_BCs = set(true_BCs[0].values)
+			mrg_sel = mrg_sel.loc[[not bc in true_BCs for bc in mrg_sel["BC"].values]]
+
 		with poolcontext(processes = options.ncores) as pool:
-			pool.map(partial(wrapping.batch_seq_comp, target = mrg_sel, options = options), mrg_sel.iloc[0:(mrg_sel.shape[0] - 1)].values.tolist())
+			pool.map(partial(wrapping.batch_seq_comp, target = mrg_sel, options = options), queries)
+
+		hours, minutes, seconds = misc.get_time_elapse(step_time)
+		misc.report_time_elapse(hours, minutes, seconds)
 
 		#===merging CB===
 		step_time = time.time()
 		print("Merging table...", flush = True)
-		res_df = wrapping.merge_cb_new(mrg_sel, options)
+		BC_index = [q[0] for q in queries]
+		res_df = wrapping.merge_cb_new(BC_index, options)
 		print("Done", flush = True)
 		hours, minutes, seconds = misc.get_time_elapse(step_time)
 		misc.report_time_elapse(hours, minutes, seconds)
