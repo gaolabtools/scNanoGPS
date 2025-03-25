@@ -9,6 +9,12 @@ Single cell, Nanopore, RNA sequencing, long read, cell barcode demultiplex, UMI 
 # Citing scNanoGPS
 Shiau, CK., Lu, L., Kieser, R. et al. High throughput single cell long-read sequencing analyses of same-cell genotypes and phenotypes in human tumors. Nat Commun 14, 4124 (2023). https://doi.org/10.1038/s41467-023-39813-7
 
+# Update for scNanoGPS v2.0
+1. Scanner is now using biopython Align module and no longer popping up deprecated warnings.
+2. Assigner is now taking whitelist and is available for long-read spatial RNA-seq data.
+3. Curator efficiency is doubled.
+4. Isoform calling is now switching to IsoQuant.
+
 # Index
 - [Installation](#installation)
 - [Step 1: NanoQC](#step-1-nanoqc)
@@ -196,7 +202,8 @@ sh run_scNanoGPS.py
 
 # Results of scNanoGPS:
 By default, the matrices of gene expression, isoform, and SNV (single nucleotide variation) are under scNanoGPS_res.
-There is also a summary report under scNanoGPS_res named "summary.txt"
+All the matrices are well formated in tabular form and are ready for secondary analyses.
+A summary report under scNanoGPS_res named "summary.txt" is ready for quick QA/QC check.
 
 # Step-by-Step running scNanoGPS:
 If you prefer to run each components of scNanoGPS step-by-step, the following tutorial can walk you through all the components of scNanoGPS.
