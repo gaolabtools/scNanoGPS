@@ -44,19 +44,10 @@ if __name__ == "__main__":
 
 	print()
 	#===read input fastq===
-	if options.isFile:
-		f_list = list([options.fq_f_name])
-		f_idx  = 0
-		print("Processing file name: " + str(options.fq_f_name))
-		reader = scanner_io.open_file(options.fq_f_name, "rt")
-
-	if options.isDir:
-		f_list = preprocessing.get_valid_input_file_list(options.cwd, options.fq_f_name)
-		f_idx  = 0
-		if not f_list[f_idx].endswith(".fast5"):
-			print("Processing file name: " + str(f_list[f_idx]))
-		reader = scanner_io.open_file(os.path.join(options.cwd, options.fq_f_name, f_list[f_idx]), "rt")
-
+	f_list = preprocessing.get_fq_list(options)
+	f_idx  = 0
+	print("Processing file name: " + str(f_list[f_idx]))
+	reader = scanner_io.open_file(os.path.join(options.cwd, f_list[f_idx]), "rt")
 	writer = scanner_io.open_file(options.fq_o_name, "wt")
 
 	while True:

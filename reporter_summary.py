@@ -27,18 +27,21 @@ parser.add_option("--read_len_f",  dest = "read_len_f",  nargs = 1, default = "r
 parser.add_option("--CB_file",     dest = "CB_file",     nargs = 1, default = "filtered_barcode_list.txt",
                   help = "File name for filtered barcode list. "
                          "Default: filtered_barcode_list.txt")
-parser.add_option("--exp_tb",      dest = "exp_tb",      nargs = 1, default = "matrix.tsv",
+parser.add_option("--exp_tb",      dest = "exp_tb",      nargs = 1, default = "gene_exp_matrix.tsv.gz",
                   help = "Counting table name. "
-                         "Default: matrix.tsv")
+                         "Default: matrix.tsv.gz")
+parser.add_option("--mrg_bam",     dest = "mrg_bam",     nargs = 1, default = None,
+                  help = "Merged bam file. "
+                         "Default: None")
 parser.add_option("--ref_genome",  dest = "ref_genome",  nargs = 1, default = None,
                   help = "* Required ! "
                          "File for reference genome.")
 parser.add_option("--gtf",         dest = "gtf",         nargs = 1, default = None,
                   help = "* Required ! "
                          "Genome annotation file GTF.")
-parser.add_option("--log",         dest = "log_f_name",  nargs = 1, default = "summary.txt",
+parser.add_option("--log",         dest = "log_f_name",  nargs = 1, default = "logs/summary.txt",
                   help = "Log file name. "
-                         "Default: summary.txt")
+                         "Default: logs/summary.txt")
 parser.add_option("--samtools",    dest = "samtools",    nargs = 1, default = "samtools",
                   help = "Path to samtools. "
                          "Default: samtools")
@@ -48,6 +51,9 @@ parser.add_option("--qualimap",    dest = "qualimap",    nargs = 1, default = "q
 parser.add_option("--qualimap_param", dest = "qualimap_param", nargs = 1, default = "",
                   help = "Additional parameters to qualimap. "
                          "For example: --java-mem-size=4G")
+parser.add_option("--keep_meta",  dest = "keep_meta",  nargs = 1, default = None,
+                  help = "Set it to 1 to keep meta data, e.g. sam files, for futher checking. "
+                         "Default: None")
 options, arguments = parser.parse_args()
 
 #===pre-check===
@@ -55,7 +61,6 @@ options.exp_tb = os.path.join(options.o_dir, options.exp_tb)
 options.compression = None
 if options.exp_tb.endswith('.gz'):
 	options.compression = 'gzip'
-options.log_f_name = os.path.join(options.o_dir, options.log_f_name)
 
 termination = False
 if not options.ref_genome or \
@@ -73,8 +78,8 @@ if not os.path.isdir(options.tmp_dir):
 	print("\nTemporary directory is not exist: " + options.tmp_dir + "\n")
 	print(options.tmp_dir)
 	termination = True
-if not os.path.isfile(os.path.join(options.o_dir, options.scanner_log)):
-	print("\nCannot find scanner log file at: " + str(os.path.join(options.o_dir, options.scanner_log)))
+if not os.path.isfile(os.path.join('logs', options.scanner_log)):
+	print("\nCannot find scanner log file at: " + str(os.path.join('logs', options.scanner_log)))
 	termination = True
 if not os.path.isfile(os.path.join(options.o_dir, options.bc_f)):
 	print("\nCannot find barcode list file at: " + str(os.path.join(options.o_dir, options.bc_f)))
@@ -108,7 +113,7 @@ if termination:
 
 #===parse scanner log===
 print("\n\nParsing scanner log ...", flush = True)
-fh = open(os.path.join(options.o_dir, options.scanner_log), "rt")
+fh = open(os.path.join('logs', options.scanner_log), "rt")
 total_read_no, pass_read_no, detecting_rate = 0, 0, 0
 while True:
 	line = fh.readline()
@@ -165,6 +170,8 @@ else:
 				break
 			CB_list.append(CB_name)
 	bam_list = [x + ".curated.minimap2.bam" for x in CB_list]
+	if not options.keep_meta:
+		os.system("mv " + options.CB_file + " " + options.tmp_dir)
 
 #===merge bam files===
 print("\nMerging all bam file for qualimap...\n", flush = True)
@@ -172,9 +179,11 @@ bam_counter, umi_per_cell = 0, list()
 for bam_f in bam_list:
 	bam_counter += 1
 	print(str(bam_counter) + " of " + str(len(bam_list)) + " files...", end = "\r", flush = True)
-	cmd = options.samtools + " view " + os.path.join(options.tmp_dir, bam_f) + \
-	      " >> " + os.path.join(options.tmp_dir, "master.sam")
-	os.system(cmd)
+
+	if not options.mrg_bam:
+		cmd = options.samtools + " view " + os.path.join(options.tmp_dir, bam_f) + \
+		      " >> " + os.path.join(options.tmp_dir, "master.sam")
+		os.system(cmd)
 
 	#===calc median UMI no per cell==
 	cmd = options.samtools + " view " + os.path.join(options.tmp_dir, bam_f) + \
@@ -186,23 +195,31 @@ for bam_f in bam_list:
 	umi_per_cell.append(int(out_msg.decode("utf-8").rstrip()))
 
 print()
-cmd = options.samtools + " view -Sb " + os.path.join(options.tmp_dir, "master.sam") + \
-      " -T " + options.ref_genome + \
-      " -o " + os.path.join(options.tmp_dir, "master.unsorted.bam")
-os.system(cmd)
 
-cmd = "rm " + os.path.join(options.tmp_dir, "master.sam")
-os.system(cmd)
+if not options.mrg_bam:
+	cmd = options.samtools + " view -Sb " + os.path.join(options.tmp_dir, "master.sam") + \
+              " -T " + options.ref_genome + \
+              " -o " + os.path.join(options.tmp_dir, "master.unsorted.bam")
+	os.system(cmd)
 
-cmd = options.samtools + " sort " + os.path.join(options.tmp_dir, "master.unsorted.bam") + \
-      " -o " + os.path.join(options.tmp_dir, "master.bam")
-os.system(cmd)
+	cmd = "rm " + os.path.join(options.tmp_dir, "master.sam")
+	os.system(cmd)
 
-cmd = "rm " + os.path.join(options.tmp_dir, "master.unsorted.bam")
-os.system(cmd)
+	cmd = options.samtools + " sort " + os.path.join(options.tmp_dir, "master.unsorted.bam") + \
+	      " -o " + os.path.join(options.tmp_dir, "master.bam")
+	os.system(cmd)
 
-cmd = options.samtools + " index " + os.path.join(options.tmp_dir, "master.bam")
-os.system(cmd)
+	cmd = "rm " + os.path.join(options.tmp_dir, "master.unsorted.bam")
+	os.system(cmd)
+
+	cmd = options.samtools + " index " + os.path.join(options.tmp_dir, "master.bam")
+	os.system(cmd)
+else:
+	cmd = "ln -s " + os.path.abspath(os.path.expanduser(options.mrg_bam)) + " " + os.path.abspath(os.path.expanduser(os.path.join(options.tmp_dir, "master.bam")))
+	os.system(cmd)
+	cmd = "ln -s " + os.path.abspath(os.path.expanduser(options.mrg_bam + ".bai ")) + os.path.abspath(os.path.expanduser(os.path.join(options.tmp_dir, "master.bam.bai")))
+	os.system(cmd)
+
 print("Done.\n", flush = True)
 
 #===count confidently mapped reads===
@@ -224,15 +241,6 @@ expr_mean = np.mean(expr_list)
 expr_med  = np.median(expr_list)
 
 #===count median UMI number per cell===
-#cmd = options.samtools + " view " + os.path.join(options.tmp_dir, "master.bam") + \
-#      ' | cut -f1 | cut -d \'_\' -f2'
-#proc = subprocess.Popen(cmd, shell = True,
-#       stdout = subprocess.PIPE,
-#       stderr = subprocess.PIPE)
-#out_msg, err_msg = proc.communicate()
-
-#UMI_no_list = out_msg.decode("utf-8").rstrip().split("\n")
-#unique, counts = np.unique(UMI_no_list, return_counts = True)
 median_umi_no = round(np.median(umi_per_cell), 2)
 
 #===qualimap===
@@ -260,9 +268,6 @@ while True:
 	if match:
 		intergenic_ratio = float(match[1])
 
-#	match = re.match("\s+overlapping exon \=\s+[\d,]+\s\(([\d\.]+)\%\)", line)
-#	if match:
-#		overlapping_exon_ratio = float(match[1])
 fh.close()
 print("Done.\n", flush = True)
 
@@ -293,4 +298,9 @@ logger.write("Intronic:                    " + str(intronic_ratio) + '%' + "\n")
 logger.write("Intergenic:                  " + str(intergenic_ratio) + '%' + "\n")
 
 logger.close()
+
+if not options.keep_meta:
+	os.system("rm " + options.read_len_f)
+	os.system("mv " + options.bc_f + " " + options.tmp_dir)
+
 print("Done.\n", flush = True)

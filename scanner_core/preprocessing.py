@@ -24,11 +24,11 @@ def getOptions():
                           nargs = 1, type = "int",
                           help = "Number of cores for program running. "
                                  "Default: 1")
-	parser.add_option("--log", dest = "log_f_name",     default = "scanner.log.txt",
+	parser.add_option("--log", dest = "log_f_name",     default = 'logs/scanner.log.txt',
                           nargs = 1, type = "string",
                           help = "Program log file. "
                                  "This file stores program running parameters and counting details. "
-                                 "Default: scanner.log.txt")
+                                 "Default: logs/scanner.log.txt")
 	parser.add_option("--a5", dest = "adaptor_five_p",  default = "AAGCAGTGGTATCAACGCAGAGTACAT",
                           nargs = 1, type = "string",
                           help = "Sequence of 5'-adaptor. "
@@ -115,7 +115,6 @@ def precheck(parser, options, arguments):
 
 	options.fq_o_name  = os.path.join(options.o_dir, options.fq_o_name)
 	options.bc_f_name  = os.path.join(options.o_dir, options.bc_f_name)
-	options.log_f_name = os.path.join(options.o_dir, options.log_f_name)
 
 	options.isFile = os.path.isfile(options.fq_f_name)
 	options.isDir  = os.path.isdir(options.fq_f_name)
@@ -203,6 +202,14 @@ def precheck(parser, options, arguments):
 		'counter_t_perfect_3p':  0}
 
 	return parser, options, arguments, counter
+
+def get_fq_list(options):
+	f_list = list()
+	if options.isFile:
+		f_list = list([options.fq_f_name])
+	if options.isDir:
+		f_list = get_valid_input_file_list(options.cwd, options.fq_f_name)
+	return f_list
 
 def get_valid_input_file_list(cwd, my_path):
 	import os

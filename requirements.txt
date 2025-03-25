@@ -1,6 +1,5 @@
 biopython
 distance
-liqa
 matplotlib
 pandas
 pysam

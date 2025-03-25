@@ -4,98 +4,56 @@ def getHeader(na_seq, options):
 def getTail(na_seq, options):
 	return na_seq[-options.scan_region:len(na_seq)].translate(str.maketrans({'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}))[::-1]
 
-def mySort(posList, rev = False):
-	posList = list(filter(None, posList))
-	if len(posList) > 0:
-		return sorted(posList, reverse = rev)[0]
-	else:
-		return None
+def gen_alignment(seq1, seq2, options):
+	from Bio import Align
 
-def median_search(na_seq, adaptor, m_threshold):
-	min_mm = len(adaptor) + 1
-	best_pos  = -1
-	for i in range(len(adaptor), len(na_seq)):
-		matching_p = ''
-		mm_no = 0
-		for j in range(0, len(adaptor)):
-			na_pos  = i - j
-			ada_pos = len(adaptor) - 1 - j
+	aligner                  = Align.PairwiseAligner()
+	aligner.mode             = 'local'
+	aligner.match_score      = options.dp_penalty[0]
+	aligner.mismatch_score   = options.dp_penalty[1]
+	aligner.open_gap_score   = options.dp_penalty[2]
+	aligner.extend_gap_score = options.dp_penalty[3]
 
-			if na_seq[na_pos] != adaptor[ada_pos]:
-				mm_no = mm_no + 1
-				matching_p = matching_p + ' '
-			else:
-				matching_p = matching_p + '|'
+	return aligner.align(seq1, seq2)
 
-			if mm_no > min_mm:
-				matching_p = ''
-				break
-
-		if matching_p != '':
-			if mm_no < min_mm:
-				min_mm = mm_no
-				best_pos = i
-
-	if min_mm <= (len(adaptor) * (1 - m_threshold)):
-		return best_pos - len(adaptor) + 1
-	else:
-		return None
-
-def precise_search(full_na_seq, adaptor, start_pos, end_pos, scoring_threshold, dp_penalty):
-	from Bio import pairwise2
-
-	if start_pos < 0:
-		start_pos = 0
-	if end_pos >= len(full_na_seq):
-		end_pos = len(full_na_seq) - 1
-	na_seq = full_na_seq[start_pos:end_pos]
-
-	alignment_res = pairwise2.align.localms(na_seq, adaptor, dp_penalty[0], dp_penalty[1], dp_penalty[2], dp_penalty[3], one_alignment_only = True)
+def adaptor_search(na_seq, adaptor, options):
+	alignment_res = gen_alignment(na_seq, adaptor, options)
 
 	if len(alignment_res) == 0:
+	        return None
+
+	aln_res = alignment_res[0]
+	for aln in alignment_res:
+		if aln.score >= aln_res.score:
+			aln_res = aln
+
+	if aln_res.score < len(adaptor) * options.dp_penalty[0] * options.scoring_threshold:
 		return None
 
-	seqA  = str(alignment_res[0].seqA)
-	seqB  = str(alignment_res[0].seqB)
-	start = 0
-	end   = len(alignment_res[0].seqA) - 1
-	while seqB[start] == '-':
-		start += 1
-	while seqB[end] == '-':
-		end -= 1
-
-	if alignment_res[0].score < len(adaptor) * dp_penalty[0] * scoring_threshold and (start_pos != 0 or start != 0):
-		return False
-
-	alignment, gap_no = "", 0
-	for i in range(start, end + 1):
-		if seqA[i] == seqB[i]:
-			alignment += "|"
-		else:
-			alignment += " "
-		if seqA[i] == '-':
+	start = int(aln_res.indices[0][0])
+	end   = int(aln_res.indices[0][-1]) + 1
+	seqA, seqB = aln_res
+	alignment, gap_no = [], 0
+	for a, b in zip(seqA, seqB):
+		if a == '-' or b == '-':
+			alignment.append('-')
 			gap_no += 1
-
-	return mappingRes(seqA, seqB, start, end + 1, alignment_res[0].score, alignment, gap_no, start_pos)
-
-def chech_alignment(na_seq, adaptor, start_pos, end_pos, a):
-	print("na_seq: ", end = "")
-	if (start_pos + a.start - a.seqA[a.start:a.end].count('-')) > 0:
-		print(" " * (start_pos + a.start - a.seqA[a.start:a.end].count('-')), end = "")
-	print(a.seqA[a.start:a.end])
-
-	print("        ", end = "")
-	print(" " * (start_pos + a.start - a.seqA[a.start:a.end].count('-')), end = "")
-	for i in range(a.start, a.end):
-		if a.seqA[i] == a.seqB[i]:
-			print("|", end = "")
+		elif a == b:
+			alignment.append('|')
 		else:
-			print(" ", end = "")
-	print()
+			alignment.append(' ')
 
-	print("adaptor:", end = "")
-	print(" " * (a.start_pos + start - seqA[start:end].count('-')), end = "")
-	print(seqB[start:end])
+	return mappingRes(seqA, seqB, start, end, aln_res.score, "".join(alignment), gap_no)
+
+def polyT_search(na_seq, options):
+	pos_list = list()
+	alignment_res = gen_alignment(na_seq, options.polyT, options)
+
+	for aln in alignment_res:
+		if aln.score >= len(options.polyT) * options.dp_penalty[0] * options.scoring_threshold:
+			pos_list.append([aln.indices[0][0], aln.indices[0][1]])
+
+	return pos_list
 
 def ten_nano_workflow(read_data, options):
 	from scanner_core import scanner_io
@@ -114,22 +72,22 @@ def ten_nano_workflow(read_data, options):
 
 	#===get head/tail region of na_seq===
 	na_seq_header = getHeader(read_data['na_seq'], options)
-	na_seq_tail   = getTail(read_data['na_seq'], options)
+	na_seq_tail   = getTail(read_data['na_seq'],   options)
 	qu_seq_header = getHeader(read_data['qu_seq'], options)
-	qu_seq_tail   = getTail(read_data['qu_seq'], options)
+	qu_seq_tail   = getTail(read_data['qu_seq'],   options)
 
 	#===Step 1: Brute force median search===
-	ht_res = median_search(na_seq_header, options.polyT, options.matching_percentage)
-	tt_res = median_search(na_seq_tail,   options.polyT, options.matching_percentage)
+	ht_res = polyT_search(na_seq_header, options)
+	tt_res = polyT_search(na_seq_tail,   options)
 
 	#===Step 2: Precisely search===
 	h5_ps_res, h3_ps_res, t5_ps_res, t3_ps_res = None, None, None, None
-	if ht_res:
-		h3_ps_res = precise_search(na_seq_header, options.adaptor_three_p, 0, options.scan_region, options.scoring_threshold, options.dp_penalty)
-		t5_ps_res = precise_search(na_seq_tail,   options.adaptor_five_p,  0, options.scan_region, options.scoring_threshold, options.dp_penalty)
-	if tt_res:
-		t3_ps_res = precise_search(na_seq_tail,   options.adaptor_three_p, 0, options.scan_region, options.scoring_threshold, options.dp_penalty)
-		h5_ps_res = precise_search(na_seq_header, options.adaptor_five_p,  0, options.scan_region, options.scoring_threshold, options.dp_penalty)
+	if len(ht_res) > 0:
+		h3_ps_res = adaptor_search(na_seq_header, options.adaptor_three_p, options)
+		t5_ps_res = adaptor_search(na_seq_tail,   options.adaptor_five_p,  options)
+	if len(tt_res) > 0:
+		t3_ps_res = adaptor_search(na_seq_tail,   options.adaptor_three_p, options)
+		h5_ps_res = adaptor_search(na_seq_header, options.adaptor_five_p,  options)
 
 	#===Step 3: tie breaker for co-existence of h3 and t3===
 	#===use BC+UMI+polyT to break tie===
@@ -152,7 +110,7 @@ def ten_nano_workflow(read_data, options):
 	if h3_ps_res:
 		res_data['counter_h_3p'] = 1
 		#===check boundaries===
-		if h3_ps_res.adaptor_start + h3_ps_res.end - h3_ps_res.gap_no < len(options.adaptor_three_p):
+		if h3_ps_res.end < len(options.adaptor_three_p):
 			res_data['counter_h_partial_3p']  = 1
 		if ((h3_ps_res.end - h3_ps_res.start) == len(options.adaptor_three_p)) and \
 		   h3_ps_res.gap_no == 0 and \
@@ -164,21 +122,13 @@ def ten_nano_workflow(read_data, options):
 			res_data['counter_h_last_12_mm']  = 1
 		if h3_ps_res.alignment[-1] == " " and h3_ps_res.alignment[-2] == " " and h3_ps_res.alignment[-3] == " ":
 			res_data['counter_h_last_123_mm'] = 1
-
-		if h3_ps_res.seqA[h3_ps_res.end - 1] == "-" or h3_ps_res.seqB[h3_ps_res.end - 1] == "-":
-			res_data['counter_h_last_1_i'] = 1
-		if h3_ps_res.seqA[h3_ps_res.end - 2] == "-" or h3_ps_res.seqB[h3_ps_res.end - 2] == "-":
-			res_data['counter_h_last_2_i'] = 1
-		if h3_ps_res.seqA[h3_ps_res.end - 3] == "-" or h3_ps_res.seqB[h3_ps_res.end - 3] == "-":
-			res_data['counter_h_last_3_i'] = 1
 		#===check boundaries===
 
 	if t3_ps_res:
 		res_data['counter_t_3p'] = 1
 		#===check boundaries===
-		if t3_ps_res.adaptor_start + t3_ps_res.end - t3_ps_res.gap_no < len(options.adaptor_three_p):
+		if t3_ps_res.end < len(options.adaptor_three_p):
 			res_data['counter_t_partial_3p']  = 1
-
 		if ((t3_ps_res.end - t3_ps_res.start) == len(options.adaptor_three_p)) and \
 		   t3_ps_res.gap_no == 0 and \
 		   len([s for s in t3_ps_res.alignment if s == '|']) == len(options.adaptor_three_p):
@@ -189,60 +139,45 @@ def ten_nano_workflow(read_data, options):
 			res_data['counter_t_last_12_mm']  = 1
 		if t3_ps_res.alignment[-1] == " " and t3_ps_res.alignment[-2] == " " and t3_ps_res.alignment[-3] == " ":
 			res_data['counter_t_last_123_mm'] = 1
-
-		if t3_ps_res.seqA[t3_ps_res.end - 1] == "-" or t3_ps_res.seqB[t3_ps_res.end - 1] == "-":
-			res_data['counter_t_last_1_i'] = 1
-		if t3_ps_res.seqA[t3_ps_res.end - 2] == "-" or t3_ps_res.seqB[t3_ps_res.end - 2] == "-":
-			res_data['counter_t_last_2_i'] = 1
-		if t3_ps_res.seqA[t3_ps_res.end - 3] == "-" or t3_ps_res.seqB[t3_ps_res.end - 3] == "-":
-			res_data['counter_t_last_3_i'] = 1
 		#===check boundaries===
 
 	#===Step 5: Extract BC, UMI===
 	orientation, BC_start, UMI_start, BC_seq, UMI_seq, Seq_end, mean_quality = None, None, None, None, None, len(read_data['na_seq']), None
-	if h3_ps_res and ht_res and check_adaptor_BC_UMI_polyT_in_distance(h3_ps_res, ht_res, options):
+	if h3_ps_res and check_adaptor_BC_UMI_polyT_in_distance(h3_ps_res, ht_res, options):
 		res_data['counter_h_3p_polyT'] = 1
-		BC_start    = h3_ps_res.adaptor_start + h3_ps_res.end - h3_ps_res.gap_no
-		rc_seq      = na_seq_header
-		if BC_start > 50:
-			rc_seq = read_data['na_seq']
-		BC_seq      = rc_seq[BC_start:BC_start + options.BC_len]
-
-		UMI_start   = BC_start + options.BC_len
-		UMI_seq     = rc_seq[UMI_start:UMI_start + options.UMI_len]
+		BC_start     = h3_ps_res.end
+		rc_seq       = read_data['na_seq']
+		BC_seq       = rc_seq[BC_start:BC_start + options.BC_len]
+		UMI_start    = BC_start + options.BC_len
+		UMI_seq      = rc_seq[UMI_start:UMI_start + options.UMI_len]
 
 		if t5_ps_res:
-			Seq_end = len(read_data['na_seq']) - (t5_ps_res.adaptor_start + t5_ps_res.end - t5_ps_res.gap_no)
+			Seq_end = len(read_data['na_seq']) - t5_ps_res.end
 
-		BC_quality  = read_data['qu_seq'][BC_start:BC_start + options.BC_len]
-		sum_quality = 0
+		BC_quality   = read_data['qu_seq'][BC_start:BC_start + options.BC_len]
+		sum_quality  = 0
 		for i in range(0, len(BC_quality)):
 			sum_quality += (ord(BC_quality[i]) - 33)
 		mean_quality = round(sum_quality / len(BC_quality), 2)
+		orientation  = "H"
 
-		orientation = "H"
-
-	if t3_ps_res and tt_res and check_adaptor_BC_UMI_polyT_in_distance(t3_ps_res, tt_res, options):
+	if t3_ps_res and check_adaptor_BC_UMI_polyT_in_distance(t3_ps_res, tt_res, options):
 		res_data['counter_t_3p_polyT'] = 1
-		BC_start    = t3_ps_res.adaptor_start + t3_ps_res.end - t3_ps_res.gap_no
-		rc_seq      = na_seq_tail
-		if BC_start > 50:
-			rc_seq     = read_data['na_seq'].translate(str.maketrans({'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}))[::-1]
-		BC_seq      = rc_seq[BC_start:BC_start + options.BC_len]
-
-		UMI_start   = BC_start + options.BC_len
-		UMI_seq     = rc_seq[UMI_start:UMI_start + options.UMI_len]
+		BC_start     = t3_ps_res.end
+		rc_seq       = read_data['na_seq'].translate(str.maketrans({'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}))[::-1]
+		BC_seq       = rc_seq[BC_start:BC_start + options.BC_len]
+		UMI_start    = BC_start + options.BC_len
+		UMI_seq      = rc_seq[UMI_start:UMI_start + options.UMI_len]
 
 		if h5_ps_res:
-			Seq_end = len(read_data['na_seq']) - (h5_ps_res.adaptor_start + h5_ps_res.end - h5_ps_res.gap_no)
+			Seq_end = len(read_data['na_seq']) - h5_ps_res.end
 
-		BC_quality  = read_data['qu_seq'][::-1][BC_start:BC_start + options.BC_len]
-		sum_quality = 0
+		BC_quality   = read_data['qu_seq'][::-1][BC_start:BC_start + options.BC_len]
+		sum_quality  = 0
 		for i in range(0, len(BC_quality)):
 			sum_quality += (ord(BC_quality[i]) - 33)
 		mean_quality = round(sum_quality / len(BC_quality), 2)
-
-		orientation = "T"
+		orientation  = "T"
 
 	res_data['rid']          = read_data['def_line'].split(' ')[0].split('@')[1]
 	res_data['orientation']  = orientation
@@ -257,47 +192,47 @@ def ten_nano_workflow(read_data, options):
 		print("header: " + na_seq_header)
 		if h3_ps_res:
 			scanner_io.printPSAlignment(h3_ps_res)
-			BC_start = h3_ps_res.adaptor_start + h3_ps_res.end - h3_ps_res.gap_no
-			print("h3_ps_res.adaptor_start: " + str(h3_ps_res.adaptor_start))
-			print("h3_ps_res.end:           " + str(h3_ps_res.end))
-			print("h3_ps_res.gap_n:         " + str(h3_ps_res.gap_no))
-			print("BC_start:                " + str(BC_start))
+			BC_start = h3_ps_res.end
+			print("h3_ps_res.start: " + str(h3_ps_res.start + 1))
+			print("h3_ps_res.end:   " + str(h3_ps_res.end))
+			print("h3_ps_res.gap_n: " + str(h3_ps_res.gap_no))
+			print("BC_start:        " + str(BC_start + 1))
 			scanner_io.printAlignment(na_seq_header[BC_start:                  BC_start + options.BC_len],
 			                                        BC_start,                  "BC")
 			scanner_io.printAlignment(na_seq_header[BC_start + options.BC_len: BC_start + options.BC_len + options.UMI_len],
 			                                        BC_start + options.BC_len, "UMI")
-		if ht_res:
-			scanner_io.printAlignment(options.polyT, ht_res, "polyT")
+		if len(ht_res) > 0:
+			scanner_io.printPT(ht_res)
 		if h5_ps_res:
 			scanner_io.printPSAlignment(h5_ps_res)
-			sequence_end = h5_ps_res.adaptor_start + h5_ps_res.end - h5_ps_res.gap_no
-			print("h5_ps_res.adaptor_start: " + str(h5_ps_res.adaptor_start))
-			print("h5_ps_res.end:           " + str(h5_ps_res.end))
-			print("h5_ps_res.gap_n:         " + str(h5_ps_res.gap_no))
-			print("sequence_end:            " + str(sequence_end))
+			sequence_end = h5_ps_res.end
+			print("h5_ps_res.start: " + str(h5_ps_res.start + 1))
+			print("h5_ps_res.end:   " + str(h5_ps_res.end))
+			print("h5_ps_res.gap_n: " + str(h5_ps_res.gap_no))
+			print("sequence_end:    " + str(sequence_end))
 		print()
 
 		print("tail:   " + na_seq_tail)
 		if t3_ps_res:
 			scanner_io.printPSAlignment(t3_ps_res)
-			BC_start = t3_ps_res.adaptor_start + t3_ps_res.end - t3_ps_res.gap_no
-			print("t3_ps_res.adaptor_start: " + str(t3_ps_res.adaptor_start))
-			print("t3_ps_res.end:           " + str(t3_ps_res.end))
-			print("t3_ps_res.gap_n:         " + str(t3_ps_res.gap_no))
-			print("BC_start:                " + str(BC_start))
+			BC_start = t3_ps_res.end
+			print("t3_ps_res.start: " + str(t3_ps_res.start + 1))
+			print("t3_ps_res.end:   " + str(t3_ps_res.end))
+			print("t3_ps_res.gap_n: " + str(t3_ps_res.gap_no))
+			print("BC_start:        " + str(BC_start + 1))
 			scanner_io.printAlignment(na_seq_tail[BC_start:                  BC_start + options.BC_len],
 			                                      BC_start,                  "BC")
 			scanner_io.printAlignment(na_seq_tail[BC_start + options.BC_len: BC_start + options.BC_len + options.UMI_len],
 			                                      BC_start + options.BC_len, "UMI")
-		if tt_res:
-			scanner_io.printAlignment(options.polyT, tt_res, "polyT")
+		if len(tt_res) > 0:
+			scanner_io.printPT(tt_res)
 		if t5_ps_res:
 			scanner_io.printPSAlignment(t5_ps_res)
-			sequence_end = t5_ps_res.adaptor_start + t5_ps_res.end - t5_ps_res.gap_no
-			print("t5_ps_res.adaptor_start: " + str(t5_ps_res.adaptor_start))
-			print("t5_ps_res.end:           " + str(t5_ps_res.end))
-			print("t5_ps_res.gap_n:         " + str(t5_ps_res.gap_no))
-			print("sequence_end:            " + str(sequence_end))
+			sequence_end = t5_ps_res.end
+			print("t5_ps_res.start: " + str(t5_ps_res.start + 1))
+			print("t5_ps_res.end:   " + str(t5_ps_res.end))
+			print("t5_ps_res.gap_n: " + str(t5_ps_res.gap_no))
+			print("sequence_end:    " + str(sequence_end))
 		print()
 
 		if res_data['orientation']:
@@ -326,21 +261,21 @@ def counting_res(res_data, counter, tmp_data):
 	return res_data, counter
 
 def check_adaptor_BC_UMI_polyT_in_distance(ps_res, t_res, options):
-	BC_end = ps_res.adaptor_start + ps_res.end - ps_res.gap_no
-	if (t_res - BC_end) >= (options.BC_len + options.UMI_len - options.UMI_len * 0.75) and \
-	   (t_res - BC_end) <= (options.BC_len + options.UMI_len + options.UMI_len * 0.75):
-		return True
-	else:
-		return False
+	BC_end = ps_res.end
+	if len(t_res) > 0:
+		for pt_list in t_res:
+			if (pt_list[0] - BC_end) >= (options.BC_len + options.UMI_len * (1 - 0.75)) and \
+			   (pt_list[0] - BC_end) <= (options.BC_len + options.UMI_len * (1 + 0.75)):
+				return True
+	return False
 
 class mappingRes:
-	def __init__(self, seqA, seqB, start, end, score, alignment, gap_no, adaptor_start):
-		self.seqA  = seqA
-		self.seqB  = seqB
-		self.start = start
-		self.end   = end
-		self.score = score
+	def __init__(self, seqA, seqB, start, end, score, alignment, gap_no):
+		self.seqA      = seqA
+		self.seqB      = seqB
+		self.start     = start
+		self.end       = end
+		self.score     = score
 		self.alignment = alignment
 		self.gap_no    = gap_no
-		self.adaptor_start = adaptor_start
 

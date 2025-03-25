@@ -11,7 +11,7 @@ def getOptions():
 	parser.add_option("--CB_count",   dest = "CB_count",   nargs = 1, default = "CB_counting.tsv.gz",
                           help = "Cell barcode counting file name. "
                                  "Default: CB_counting.tsv.gz")
-	parser.add_option("--CB_list",    dest = "CB_list",    nargs = 1, default = "CB_merged_list.tsv.gz",
+	parser.add_option("--CB_mrg",     dest = "CB_mrg",     nargs = 1, default = "CB_merged_list.tsv.gz",
                           help = "File name for merged cell barcodes. "
                                  "Default: CB_merged_list.tsv.gz")
 	parser.add_option("--ref_genome", dest = "ref_genome", nargs = 1, default = None,
@@ -30,14 +30,18 @@ def getOptions():
 	parser.add_option("-t",           dest = "ncores",     nargs = 1, default = 1,
                           help = "Number of cores for computing. "
                                  "Default: 1", type = "int")
-	parser.add_option("--log",        dest = "log_f_name", nargs = 1, default = "curator.log.txt",
+	parser.add_option("--log",        dest = "log_f_name", nargs = 1, default = 'logs/curator.log.txt',
                           help = "Log file name. "
-                                 "Default: curator.log.txt")
+                                 "Default: logs/curator.log.txt")
 	parser.add_option("--umi_ld",     dest = "umi_ld",     nargs = 1, default = 1,
                           help = "Levenshtein distance for merging UMI. "
                                  "Default: 2")
 	parser.add_option("--keep_meta",  dest = "keep_meta",  nargs = 1, default = None,
                           help = "Set it to 1 to keep meta data, e.g. sam files, for futher checking. "
+                                 "Default: None")
+	parser.add_option("--inc_contig", dest = "inc_contig",  nargs = 1, default = None,
+                          help = "Set it to 1 to include non-autosome, i.e. contig or scaffold. "
+                                 "Currently the autosome is starting with \"chr\" string. "
                                  "Default: None")
 	parser.add_option("--inc_bed",    dest = "inc_bed",    nargs = 1, default = None,
                           help = "Include specific regions (BED) in file. "
@@ -48,6 +52,9 @@ def getOptions():
 	parser.add_option("--softclipping_thr", dest = "softclipping_thr", nargs = 1, default = 0.8,
                           help = "Threshold for softclipping. "
                                  "Default: 0.8")
+	parser.add_option("--max_umi_duplicates", dest = "max_umi_duplicates", nargs = 1, default = 500,
+                          help = "Maximal duplicates in UMI collapsing. "
+                                 "Default: 500", type = "int")
 	parser.add_option("--minimap2",   dest = "minimap2",   nargs = 1, default = "minimap2",
                           help = "Path to minimap2. "
                                  "Default: minimap2")
@@ -69,8 +76,7 @@ def precheck(parser, options):
 	options.fq_name    = os.path.join(options.o_dir, options.fq_name)
 	options.BC_list    = os.path.join(options.o_dir, options.BC_list)
 	options.CB_count   = os.path.join(options.o_dir, options.CB_count)
-	options.CB_list    = os.path.join(options.o_dir, options.CB_list)
-	options.log_f_name = os.path.join(options.o_dir, options.log_f_name)
+	options.CB_mrg     = os.path.join(options.o_dir, options.CB_mrg)
 
 	termination = False
 	if not options.fq_name:
@@ -79,18 +85,15 @@ def precheck(parser, options):
 	if not os.path.isfile(options.fq_name):
 		print("\nCannot find processed FastQ file: " + options.fq_name + "\n")
 		termination = True
-	if not os.path.isfile(options.CB_list):
-		print("\nCannot find Cell Barcode merged list: " + options.CB_list + "\n")
+	if not os.path.isfile(options.CB_mrg):
+		print("\nCannot find Cell Barcode merged list: " + options.CB_mrg + "\n")
 		termination = True
 	if not os.path.isfile(options.CB_count):
-		print("\nCannot find Cell Barcode counting file: " + options. CB_count + "\n")
+		print("\nCannot find Cell Barcode counting file: " + options.CB_count + "\n")
 		termination = True
 	if not os.path.isfile(options.BC_list):
 		print("\nCannot find Barcode list: " + options.BC_list + "\n")
 		termination = True
-#	if os.path.isdir(options.tmp_dir):
-#		print("\nTemporary directory exist: " + options.tmp_dir)
-#		termination = True
 	if not os.path.isdir(options.tmp_dir):
 		print("\nCreate new temporary folder: " + options.tmp_dir + "\n")
 		os.makedirs(options.tmp_dir)
@@ -118,7 +121,7 @@ def precheck(parser, options):
 		logger.write("\tInput fastQ file:           " + str(options.fq_name) + "\n")
 		logger.write("\tCell barcode list:          " + str(options.BC_list) + "\n")
 		logger.write("\tCell barcode counting file: " + str(options.CB_count) + "\n")
-		logger.write("\tMerged cell barcode list:   " + str(options.CB_list) + "\n")
+		logger.write("\tMerged cell barcode list:   " + str(options.CB_mrg) + "\n")
 		logger.write("\tReference genome:           " + str(options.ref_genome) + "\n")
 		logger.write("\tMinimap2 genome index:      " + str(options.idx_genome) + "\n")
 		logger.write("\tOutput directory:           " + str(options.o_dir) + "\n")

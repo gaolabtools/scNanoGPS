@@ -17,9 +17,9 @@ def getOptions():
 	parser.add_option("-t", dest = "ncores", nargs = 1, default = 1,
                           help = "Number of cores for program running. "
                                  "Default: 1", type = "int")
-	parser.add_option("--log", dest = "log_f_name", nargs = 1, default = "assigner.log.txt",
+	parser.add_option("--log", dest = "log_f_name", nargs = 1, default = 'logs/assigner.log.txt',
                           help = "Log file name. "
-                                 "Default: assigner.log.txt")
+                                 "Default: logs/assigner.log.txt")
 	parser.add_option("--lCB", dest = "BC_len",         default = 16,
                           nargs = 1, type = "int",
                           help = "Length of cell barcode. "
@@ -49,18 +49,24 @@ def getOptions():
 	parser.add_option("--smooth_res",  dest = "smooth_res",  nargs = 1, default = 0.001, type = float,
                           help = "Smoothening resolution on log10 scale. "
                                  "Default: 0.001")
+	parser.add_option("--min_read_no", dest = "min_read_no", nargs = 1, default = 500, type = int,
+                          help = "Minimal read number per cell. "
+                                 "Default: 500")
+	parser.add_option("--whitelist",   dest = "whitelist",   nargs = 1, default = None,
+                          help = "Barcode whitelist file. "
+                                 "Default: None")
 
 	return parser
 
 def precheck(parser, options):
 	import os, sys, time
+	import pandas as pd
 
 	options.input           = os.path.join(options.o_dir, options.input)
 	options.output          = os.path.join(options.o_dir, options.output)
 	options.CB_log10_dist_o = os.path.join(options.o_dir, options.CB_log10_dist_o)
 	options.CB_mrg_dist     = os.path.join(options.o_dir, options.CB_mrg_dist)
 	options.CB_mrg_o        = os.path.join(options.o_dir, options.CB_mrg_o)
-	options.log_f_name      = os.path.join(options.o_dir, options.log_f_name)
 
 	if not os.path.isdir(options.o_dir):
 		print("\nCannot find output dir: " + options.o_dir + " !\n")
@@ -93,6 +99,11 @@ def precheck(parser, options):
 	if options.CB_mrg_dist.endswith(".gz"):
 		options.CB_mrg_dist_ff = options.CB_mrg_dist.split(".gz")[0]
 		options.CB_mrg_dist_compression = 'gzip'
+	if options.whitelist:
+		wbc_compression = None
+		if options.whitelist.endswith(".gz"):
+			wbc_compression = 'gzip'
+		options.wbc = pd.read_table(options.whitelist, sep = '\t', header = None, compression = wbc_compression).rename(columns = {0: 'BC'})
 
 	#===output parameters===
 	with open(options.log_f_name, "wt") as logger:
@@ -108,6 +119,7 @@ def precheck(parser, options):
 		logger.write("\tMerged cell barcodes file name:       " + options.CB_mrg_o + "\n")
 		logger.write("\tLength of barcode:                    " + str(options.BC_len) + "\n")
 		logger.write("\tNumber of computer cores:             " + str(options.ncores) + "\n")
+		logger.write("\tBarcode whitelist file:               " + str(options.whitelist) + "\n")
 		logger.write("\n")
 
 	return parser, options

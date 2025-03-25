@@ -123,7 +123,7 @@ def merge_longshot(CB_list, options):
 	cmd = 'ls ' + os.path.join(options.tmp_dir, 'splitted_vcf_list_*.merge.vcf.gz') + ' > ' + os.path.join(options.tmp_dir, 'final_vcf_list')
 	os.system(cmd)
 
-	cmd = options.bcftools + ' merge -0 -l ' + os.path.join(options.tmp_dir, 'final_vcf_list') + ' -Oz -o ' + os.path.join(options.o_dir, options.o_pref) + '.raw.vcf.gz'
+	cmd = options.bcftools + ' merge -0 -l ' + os.path.join(options.tmp_dir, 'final_vcf_list') + ' -Ov -o ' + os.path.join(options.o_dir, options.o_pref) + '.raw.vcf.gz'
 	os.system(cmd)
 
 	cmd = 'rm ' + os.path.join(options.tmp_dir, 'splitted_vcf_list_*')
@@ -199,7 +199,6 @@ def merge_mpileup(CB_list, options):
 			line_list[0] = line_list[0].split("#")[1]
 			options.vcf_header = line_list
 			continue
-
 		line_list = line.split("\t")
 		pileup_obj[str(line_list[0] + ':' + line_list[1])] = {'CHROM': line_list[0], 'POS': line_list[1], 'REF': line_list[3], 'ALT': line_list[4]}
 	fh.close()
@@ -221,12 +220,11 @@ def merge_mpileup(CB_list, options):
 		dp_df = dp_df.merge(pileup_df.loc[:, ['CHROM', 'POS', 'ALT']], how = 'left', on = ['CHROM', 'POS'])
 
 		dp_df[CB] = ""
-
-		dp_df['REF_no'] = dp_df['MATCH'].str.count("[\.\,]")
-		dp_df['A']      = dp_df['MATCH'].str.count('A') + dp_df['MATCH'].str.count('a')
-		dp_df['T']      = dp_df['MATCH'].str.count('T') + dp_df['MATCH'].str.count('t')
-		dp_df['C']      = dp_df['MATCH'].str.count('C') + dp_df['MATCH'].str.count('c')
-		dp_df['G']      = dp_df['MATCH'].str.count('G') + dp_df['MATCH'].str.count('g')
+		dp_df['REF_no'] = dp_df['MATCH'].str.count("[\.\,]").astype('Int64')
+		dp_df['A']      = dp_df['MATCH'].str.count('A').astype('Int64') + dp_df['MATCH'].str.count('a').astype('Int64')
+		dp_df['T']      = dp_df['MATCH'].str.count('T').astype('Int64') + dp_df['MATCH'].str.count('t').astype('Int64')
+		dp_df['C']      = dp_df['MATCH'].str.count('C').astype('Int64') + dp_df['MATCH'].str.count('c').astype('Int64')
+		dp_df['G']      = dp_df['MATCH'].str.count('G').astype('Int64') + dp_df['MATCH'].str.count('g').astype('Int64')
 
 		for idx in range(0, dp_df.shape[0]):
 			dp_str = str(dp_df.loc[idx, 'REF_no'])
@@ -259,9 +257,9 @@ def merge_mpileup(CB_list, options):
 
 	pileup_df.to_csv(os.path.join(options.o_dir, options.o_snv_dp), sep = '\t', header = True, index = False, compression = 'gzip')
 
-	return options, pileup_df
+	return pileup_df, options
 
-def correct_vcf(options, pileup_df):
+def correct_vcf(pileup_df, options):
 	pileup_obj = dict()
 	pileup_df_idx = -1
 	fh = bgzf.open(os.path.join(options.o_dir, options.o_pref) + '.filtered.vcf.gz', 'rt')
@@ -287,7 +285,7 @@ def correct_vcf(options, pileup_df):
 					line_list[idx] += ':DP'
 				elif idx > 8:
 					cell_list = line_list[idx].split(':')
-					GT_str = mod_GT(cell_list[0], sel_row[options.vcf_header[idx]].values[0])
+					GT_str = mod_GT(sel_row[options.vcf_header[idx]].values[0])
 					line_list[idx] = GT_str + ':' + ':'.join(cell_list[1:len(cell_list)]) + ':' + sel_row[options.vcf_header[idx]].values[0]
 			pileup_df = pileup_df.drop(sel_row.index)
 			oh.write("\t".join(line_list) + "\n")
@@ -308,24 +306,27 @@ def correct_vcf(options, pileup_df):
 		cmd = 'rm ' + os.path.join(options.o_dir, options.o_pref) + '.filtered.vcf.gz.tbi'
 		os.system(cmd)
 
-	return
-
-def mod_GT(vcf_str, DP_str):
-	if DP_str == './.':
+def mod_GT(DP_str):
+# https://samtools.github.io/hts-specs/VCFv4.2.pdf
+# unphased, always use '/'
+# The allele values are 0 for the reference allele (what is in the REF field), 1 for the first allele listed in ALT, 2 for the second allele list in ALT and so on.
+	if (DP_str == './.') | (DP_str == '<NA>/<NA>'):
 		return './.'
+	elif (DP_str == '././.') | (DP_str == '<NA>/<NA>/<NA>'):
+		return '././.'
+	elif (DP_str == './././.') | (DP_str == '<NA>/<NA>/<NA>/<NA>'):
+		return './././.'
 	else:
 		DP_list = DP_str.split('/')
 		res_str, GT_counter = '', 0
 		for DP_idx in range(0, len(DP_list)):
-			if int(DP_list[DP_idx]) > 0:
+			if int(float(DP_list[DP_idx])) > 0:
 				GT_counter += 1
 				res_str += '/' + str(DP_idx)
-
 		if GT_counter == 0:
 			res_str = '/./.'
 		elif GT_counter == 1:
 			res_str += res_str
-
 		return res_str[1:]
 
 if __name__ == "__main__":
@@ -354,18 +355,18 @@ if __name__ == "__main__":
 	parser.add_option("--longshot_o", dest = "longshot_o", nargs = 1, default = "longshot.output",
                           help = "Prefix of LongShot output VCF file. "
                                  "Default: longshot.output")
-	parser.add_option("-o",           dest = "o_name",     nargs = 1, default = "matrix_SNV.vcf.gz",
+	parser.add_option("-o",           dest = "o_name",     nargs = 1, default = "SNV_matrix.vcf.gz",
 	                  help = "Result SNV matrix file name. Must be ended with .vcf.gz. "
-	                         "Default: matrix_SNV.vcf.gz")
-	parser.add_option("--log",        dest = "log_f_name", nargs = 1, default = "reporter_SNV.log.txt",
+	                         "Default: SNV_matrix.vcf.gz")
+	parser.add_option("--log",        dest = "log_f_name", nargs = 1, default = "logs/reporter_SNV.log.txt",
 	                  help = "Log file name. "
-	                         "Default: reporter_SNV.log.txt")
+	                         "Default: logs/reporter_SNV.log.txt")
 	parser.add_option("--o_snv_l",    dest = "o_snv_l",    nargs = 1, default = "filtered_SNV_position_list.tsv.gz",
                           help = "Filtered SNVs position list. "
                                  "Default: filtered_SNV_position_list.tsv.gz")
-	parser.add_option("--o_snv_dp",   dest = "o_snv_dp",   nargs = 1, default = "matrix_SNV_dp.tsv.gz",
+	parser.add_option("--o_snv_dp",   dest = "o_snv_dp",   nargs = 1, default = "SNV_dp_matrix.tsv.gz",
                           help = "SNVs depth matrix. "
-                                 "Default: matrix_SNV_dp.tsv.gz")
+                                 "Default: SNV_dp_matrix.tsv.gz")
 	parser.add_option("-t",           dest = "ncores",     nargs = 1, default = 1,
 	                  help = "Number of cores for program running. "
 	                         "Default: 1", type = "int")
@@ -411,8 +412,6 @@ if __name__ == "__main__":
 	options, arguments = parser.parse_args()
 
 	#===pre-check===
-	options.log_f_name = os.path.join(options.o_dir, options.log_f_name)
-
 	termination = False
 	if not options.ref_genome or \
 	   not os.path.isfile(options.ref_genome):
@@ -543,7 +542,6 @@ if __name__ == "__main__":
 	hours, minutes, seconds = misc.get_time_elapse(start_time)
 	misc.report_time_elapse(hours, minutes, seconds)
 
-
 	print("\nCounting reads no. supporting SNVs...", flush = True)
 
 	with poolcontext(processes = options.ncores) as pool:
@@ -554,16 +552,19 @@ if __name__ == "__main__":
 	misc.report_time_elapse(hours, minutes, seconds)
 
 	print("\nGenerating SNVs depth table...", flush = True)
-	options, pileup_df = merge_mpileup(CB_list, options)
+	pileup_df, options = merge_mpileup(CB_list, options)
 	print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()) + "\n", flush = True)
 	hours, minutes, seconds = misc.get_time_elapse(start_time)
 	misc.report_time_elapse(hours, minutes, seconds)
 
 	print("\nCorrect VCF genotype...", flush = True)
-	correct_vcf(options, pileup_df)
+	correct_vcf(pileup_df, options)
 	print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()) + "\n", flush = True)
 	hours, minutes, seconds = misc.get_time_elapse(start_time)
 	misc.report_time_elapse(hours, minutes, seconds)
+
+	if not options.keep_meta:
+		os.system("mv " + options.o_snv_l + " " + options.tmp_dir)
 
 	print()
 

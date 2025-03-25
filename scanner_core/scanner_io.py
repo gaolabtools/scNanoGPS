@@ -28,12 +28,14 @@ def output_result(o_name, stat_list, df_col):
 	stat_df = pd.DataFrame(stat_list, columns = df_col)
 	stat_df.to_csv(o_name, header = df_col, index = None, sep = '\t', mode = 'w')
 
+	return
+
 def output_fastq(writer, each_row, each_data):
 	if each_row[2]:
 		na_seq = each_data['na_seq']
 		qu_seq = each_data['qu_seq']
 		#---trim off BC & UMI---
-		start_pos = int(each_row[2]) + len(each_row[3]) + len(each_row[4]) - 1
+		start_pos = int(each_row[2]) + len(each_row[3]) + len(each_row[4])
 		#---no info for timming 5' adaptor---
 		end_pos = len(na_seq)
 		if each_row[5]:
@@ -41,7 +43,6 @@ def output_fastq(writer, each_row, each_data):
 		if each_row[1] == "T":
 			na_seq = each_data['na_seq'].translate(str.maketrans({'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}))[::-1]
 			qu_seq = each_data['qu_seq'][::-1]
-			start_pos += 1
 		writer.write(each_data['def_line'] + "\n")
 		writer.write(na_seq[start_pos:end_pos] + "\n")
 		writer.write("+\n")
@@ -68,18 +69,19 @@ def output_params(options, rid, counter, start_time):
 		logger.write("\tNumber of 3'-adaptor having mismatch at the last one position:      \t" + str(counter['counter_h_last_1_mm']   + counter['counter_t_last_1_mm'])   + "\n")
 		logger.write("\tNumber of 3'-adaptor having mismatch at all the last two position:  \t" + str(counter['counter_h_last_12_mm']  + counter['counter_t_last_12_mm'])  + "\n")
 		logger.write("\tNumber of 3'-adaptor having mismatch at all the last three position:\t" + str(counter['counter_h_last_123_mm'] + counter['counter_t_last_123_mm']) + "\n\n")
-		logger.write("\tNumber of 3'-adaptor having in/del at the last one position:        \t" + str(counter['counter_h_last_1_i']    + counter['counter_t_last_1_i'])    + "\n")
-		logger.write("\tNumber of 3'-adaptor having in/del at the last two position:        \t" + str(counter['counter_h_last_2_i']    + counter['counter_t_last_2_i'])    + "\n")
-		logger.write("\tNumber of 3'-adaptor having in/del at the last three position:      \t" + str(counter['counter_h_last_3_i']    + counter['counter_t_last_3_i'])    + "\n\n")
 		logger.write("\tNumber of rescued truncated 3'-adaptor on the read head region: \t" + str(counter['counter_h_partial_3p']) + "\n")
 		logger.write("\tNumber of rescued truncated 3'-adaptor on the read tail region: \t" + str(counter['counter_t_partial_3p']) + "\n\n")
 
 		logger.write("Finish time stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()) + "\n")
 
+	return
+
 def printPSAlignment(alignment_obj):
-	printAlignment(alignment_obj.seqA[alignment_obj.start:alignment_obj.end], alignment_obj.adaptor_start + alignment_obj.start - alignment_obj.gap_no, "seqA")
-	printAlignment(alignment_obj.alignment,                                   alignment_obj.adaptor_start + alignment_obj.start - alignment_obj.gap_no, "aln")
-	printAlignment(alignment_obj.seqB[alignment_obj.start:alignment_obj.end], alignment_obj.adaptor_start + alignment_obj.start - alignment_obj.gap_no, "seqB")
+	printAlignment(alignment_obj.seqA,      alignment_obj.start, "seqA")
+	printAlignment(alignment_obj.alignment, alignment_obj.start, "aln")
+	printAlignment(alignment_obj.seqB,      alignment_obj.start, "seqB")
+
+	return
 
 def printAlignment(alignment_seq, no_space, label):
 	if len(label) > 6:
@@ -88,6 +90,19 @@ def printAlignment(alignment_seq, no_space, label):
 		print(label + ": " + " " * (6 - len(label) - 1), end = " ")
 	print(" " * no_space, end = "")
 	print(alignment_seq)
+
+	return
+
+def printPT(aln_obj):
+	import numpy as np
+
+	aln_str = list(" " * np.max(aln_obj))
+	for aln in aln_obj:
+		for pos in range(aln[0], aln[1]):
+			aln_str[pos] = "T"
+	print("polyT:  " + "".join(aln_str))
+
+	return
 
 def batch_reading(reader, f_list, f_idx, batch_no, rid):
 	batch_data = []
