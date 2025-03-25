@@ -1,5 +1,4 @@
 [![Latest Release](https://img.shields.io/github/v/release/gaolabtools/scNanoGPS.svg?label=Latest%20Release)](https://github.com/gaolabtools/scNanoGPS/releases/latest)
-[![Total GitHub Downloads](https://img.shields.io/github/downloads/gaolabtools/scNanoGPS/total.svg?label=Total%20GitHub%20Downloads)](https://github.com/gaolabtools/scNanoGPS/releases/latest)
 
 # scNanoGPS: Single cell Nanopore sequencing analysis of Genotype and Phenotype Simultaneously
 scNanoGPS is a computational toolkit for analyzing high throughput single cell nanopore sequencing data to detect Genotypes and Phenotype Simultaneously from same cells.  scNanoGPS includes 5 major steps: 1) **NanoQC** to perform quality control of the raw seqeucning data; 2) **Scanner** to scan and filter out reads that do not have expected adapater sequence patterns, i.e., TrueSeq Read 1 adapter sequence, TSO adaper sequence, poly (A/T)n block sequence,  Cell Barcodes (CB) and unique molecule identifier (UMI) sequence blocks; 3) **Assigner** to detect the list of true cell barcodes, merge cell barcodes with sequencing errors and assign raw reads into single cells; 4) **Curator** to detect reads with true UMIs and collapse them to make consensus sequences of individual molecules to curate sequencing errors on gene bodies; 5) **Reporter** to detect single cell transcriptomes, single cell gene isoforms and single cell mutations from consensus single cell long reads data.
@@ -31,12 +30,12 @@ The scNanoGPS pipeline is built with python3. We recommend users to use anaconda
 ### Install scNanoGPS and dependencies
 - The scNanoGPS requires the following dependencies to work:
   ```
-  - biopython 1.79
+  - biopython 1.80
   - distance 0.1.3
-  - matplotlib 3.5.2
-  - pandas 1.4.2
+  - matplotlib 3.8.2
+  - pandas 2.1.4
   - pysam 0.19.0
-  - seaborn 0.11.2
+  - seaborn 0.13.1
   ```
 
 - Example codes for obtaining scNanoGPS from GitHub and installation of dependencies:
@@ -76,9 +75,9 @@ scNanoGPS uses the following third party tools for mapping again genome referenc
     
     conda install -c bioconda subread
     ```
-  - LIQA ([GitHub](https://github.com/WGLab/LIQA))
+  - IsoQuant ([GitHub](https://github.com/ablab/IsoQuant))
     ```
-    pip3 install liqa
+    conda install -c conda-forge -c bioconda isoquant
     ```
   - Longshot ([GitHub](https://github.com/pjedge/longshot), [Anaconda](https://anaconda.org/bioconda/longshot))
     ```
@@ -130,12 +129,6 @@ scNanoGPS uses the following third party tools for mapping again genome referenc
       ```
       minimap2 -x map-ont -d example/GRCh38_chr22.mmi example/GRCh38_chr22.fa.gz
       ```
-  - Index reference genome for LIQA<br />
-    This version of scNanoGPS uses LIQA as a default tool to calculate single cell isoforms. Refer to the [LIQA's manual](https://github.com/WGLab/LIQA/blob/master/doc/Usage.md#step-1-transforming-isoforms-to-compatible-matrix-based-on-reference-annotation-file) for complete instructions<br />
-    - Example code:
-      ```
-      liqa -task refgene -ref example/GRCh38_chr22.gtf -format gtf -out example/GRCh38_chr22.liqa.refgene
-      ```
   - Annotation tables for ANNOVAR<br />
     This version of scNanoGPS uses ANNOVAR to annotate single cell SNVs results, please refer to [ANNOVAR's webpage](https://annovar.openbioinformatics.org/en/latest/) for more information.
      - Example codes:
@@ -148,11 +141,58 @@ scNanoGPS uses the following third party tools for mapping again genome referenc
     ```
 
 # Using scNanoGPS
-Please re-use the master script "[run_scNanoGPS.sh](run_scNanoGPS.sh)" for your convenience.
+Please use the wrapper script "[run_scNanoGPS.py](run_scNanoGPS.py)" for your convenience.
 Make sure to update the path inside the master script with any text editor you like, then run the script with the following command.
 ```
-sh run_scNanoGPS.sh
+sh run_scNanoGPS.py
 ```
+  - Manual of run_scNanoGPS.py
+  ```
+  Usage: run_scNanoGPS.py [options]
+  
+  Options:
+    -h, --help            show this help message and exit
+    -i FQ_F_NAME          * Required ! Input FastQ/Fast5 file name, or directory
+                          containing multiple input files. Support
+                          fastq/fq/fastq.gz/fq.gz/fast5 format.
+    -d O_DIR              Output directory name. Default: scNanoGPS_res
+    --tmp_dir=TMP_DIR     Temporary folder name. Default: tmp
+    -p PROTOCOL           10x barcoding protocol. (3p / 5p / spatial) Default:
+                          3p
+    -t NCORES             Number of cores for program running. Default: 1
+    --gtf=GTF             * Required ! GTF file for expression calling.
+    --ref_genome=REF_GENOME
+                          * Required ! File for reference genome.
+    --idx_genome=IDX_GENOME
+                          Path to the Minimap2 genome index. Program will use
+                          reference genome if no Minimap2 genome index given.
+                          Default: None
+    --whitelist=WHITELIST
+                          Path to the cell barcode whitelist. Default: None
+    --exc_bed=EXC_BED     Exclude specific regions (BED) in file. Default: None
+    --isoquant=ISOQUANT   Provide path to IsoQuant to conduct isoform calling.
+                          Default: None
+    --annovar=ANNOVAR     Provide directory path to ANNOVAR to conduct SNP
+                          calling. Default: None
+    --annovardb=ANNOVARDB
+                          Name of ANNOVAR database. Default: hg38db
+    --annovargv=ANNOVARGV
+                          Version of ANNOVAR genome version. Default: hg38
+    --annovarprot=ANNOVARPROT
+                          Analysis protocol of ANNOVAR. Default: refGene,cytoBan
+                          d,gnomad30_genome,avsnp150,dbnsfp42c,cosmic96_coding,c
+                          osmic96_noncoding
+    --annovarop=ANNOVAROP
+                          Analysis operation of ANNOVAR. Default: gx,r,f,f,f,f,f
+    --annovar_xref=ANNOVAR_XREF
+                          Path to cross-reference genome of ANNOVAR. Default:
+                          hg38db/omim/gene_xref.txt
+  ```
+  - Note:
+    After running "run_scNanoGPS.py", a shell script "run_scNanoGPS.sh" will be generated.
+    Please review "run_scNanoGPS.sh" and make proper modifications per your OS and environment.
+    1. If you're using cluster management, like slurm, please include proper environment variables.
+    2. If you're using workflow management system, like nextflow or snakemake, please re-wite the script per your environments.
 
 # Results of scNanoGPS:
 By default, the matrices of gene expression, isoform, and SNV (single nucleotide variation) are under scNanoGPS_res.
@@ -315,6 +355,10 @@ Alternatively, you can forcely assign cell barcode number by using "forced_no" p
                           Minimal cell number. Default: 1
     --smooth_res=SMOOTH_RES
                           Smoothening resolution on log10 scale. Default: 0.001
+    --min_read_no=MIN_READ_NO
+                          Minimal read number per cell. Default: 500
+    --whitelist=WHITELIST
+                          Barcode whitelist file. Default: None
   ```
 
 - Example code:
@@ -358,10 +402,16 @@ The master FastQ file of all cells is demultiplexed according to the true CB lis
     --keep_meta=KEEP_META
                           Set it to 1 to keep meta data, e.g. sam files, for futher checking.
                           Default: None
+    --inc_contig=INC_CONTIG
+                          Set it to 1 to include non-autosome, i.e. contig or
+                          scaffold. Currently the autosome is starting with
+                          "chr" string. Default: None
     --inc_bed=INC_BED     Include specific regions (BED) in file. Default: None
     --exc_bed=EXC_BED     Exclude specific regions (BED) in file. Default: None
     --softclipping_thr=SOFTCLIPPING_THR
                           Threshold for softclipping. Default: 0.8
+    --max_umi_duplicates=MAX_UMI_DUPLICATES
+                          Maximal duplicates in UMI collapsing. Default: 500
     --minimap2=MINIMAP2   Path to minimap2. Default: minimap2
     --samtools=SAMTOOLS   Path to samtools. Default: samtools
     --spoa=SPOA           Path to spoa. Default: spoa
@@ -380,7 +430,7 @@ The master FastQ file of all cells is demultiplexed according to the true CB lis
 
 # Step 5: Reporter
 Lastly, scNanoGPS contains a set of reporter scripts for generating multi-omics profiles from same single cells with Nanopore long-read sequencing data.
-This version of scNanoGPS detects the gene expression, isoform, and single nucleotide variations (SNVs) profiles by using FeatureCounts, LIQA, and longshot, respectively.
+This version of scNanoGPS detects the gene expression, isoform, and single nucleotide variations (SNVs) profiles by using FeatureCounts, IsoQuant, and longshot, respectively.
 
 ### 5.1 Single cell gene expression profile
 - Manual of reporter_expression.py
@@ -394,12 +444,16 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
     --tmp_dir=TMP_DIR     Temporary folder name. Default: tmp
     --gtf=GTF             * Required ! GTF file for expression calling.
     -o O_NAME             Counting table name. Default: matrix.tsv
-    --log=LOG_F_NAME      Log file name.Default: reporter_expression.log.txt
+    --log=LOG_F_NAME      Log file name.Default:
+                          logs/reporter_expression.log.txt
     -t NCORES             Number of cores for program running. Default: 1
     --min_gene_no=MIN_GENE_NO
                           Minimal number of gene per cell. Default: 300
     --sel_bc_o=SEL_BC_O   Filtered cell barcode list. Default:
                           filtered_barcode_list.txt
+    --keep_meta=KEEP_META
+                          Keep meta files. Set to 1 to keep meta files.Default:
+                          None
     --featurecounts=FEATURECOUNTS
                           Path to featureCounts.Default: featureCounts
   ```
@@ -408,7 +462,7 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
   ```
   # Please add featureCounts into your path to use which command
   
-  python3 reporter_expression.py -t 2 --gtf example/GRCh38_chr22.gtf --featurecounts $(which featureCounts)
+  python3 reporter_expression.py -t 2 --gtf example/GRCh38_chr22.gtf
   
   # or
   
@@ -426,34 +480,37 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
   Usage: reporter_isoform.py [options]
 
   Options:
-    -h, --help           show this help message and exit
-    -d O_DIR             Output directory name. Default: scNanoGPS_res
-    --tmp_dir=TMP_DIR    Temporary folder name. Default: tmp
-    --CB_file=CB_FILE    File name for filtered barcode list. Default:
-                         filtered_barcode_list.txt
-    --gtf=GTF            GTF file for obtaining transcript ID.
-    --liqa_ref=LIQA_REF  * Required ! Reference of LIQA.
-    -o O_NAME            Counting table name. Default: matrix_isoform.tsv
-    --log=LOG_F_NAME     Log file name. Default: reporter_isoform.log.txt
-    -t NCORES            Number of cores for program running. Default: 1
-    --liqa=LIQA          Program name of LIQA. Default: liqa
-    --liqa_log=LIQA_LOG  Suffix of LIQA output file. Default: .liqa.log
-    --liqa_o=LIQA_O      Suffix of LIQA output file. Default: .liqa.tsv
+    -h, --help            show this help message and exit
+    -d O_DIR              Output directory name. Default: scNanoGPS_res
+    --tmp_dir=TMP_DIR     Temporary folder name. Default: tmp
+    --CB_file=CB_FILE     File name for filtered barcode list. Default:
+                          filtered_barcode_list.txt
+    --ref_genome=REF_GENOME
+                          * Required ! File for reference genome.
+    --gtf=GTF             * Required ! File for genome annotation.
+    --bam_suf=BAM_SUF     Suffix of the bam files. Default:
+                          .curated.minimap2.bam
+    -o O_NAME             Counting table name. Default:
+                          isoform_exp_matrix.tsv.gz
+    --log=LOG_F_NAME      Log file name. Default: logs/reporter_isoform.log.txt
+    -t NCORES             Number of cores for program running. Default: 1
+    --batch_no=BATCH_NO   Batch number for merging bam files. Default: 500
+    --samtools=SAMTOOLS   Path to samtools. Default: samtools
+    --isoquant=ISOQUANT   Program name of IsoQuant. Default: isoquant.py
+    --isoquant_d=ISOQUANT_D
+                          IsoQuant output directory. Default:
+                          scNanoGPS_res/IsoQuant_res
+    --isoquant_o=ISOQUANT_O
+                          Suffix of IsoQuant output file. Default:
+                          OUT/OUT.transcript_model_grouped_counts.tsv
   ```
 
 - Example code:
   ```
-  # Please add liqa into your path to use which command
+  # Please specify path to IsoQuant python script
   
-  python3 reporter_isoform.py -t 2 --liqa_ref example/GRCh38_chr22.liqa.refgene
+  python3 reporter_isoform.py -t 2 --ref_genome example/GRCh38_chr22.fa.gz --gtf example/GRCh38_chr22.gtf --isoquant <Path/to/isoquant.py>
   
-  # or
-  
-  python3 reporter_isoform.py -t 2 --liqa $(which liqa) --liqa_ref example/GRCh38_chr22.liqa.refgene
-  
-  # or
-  
-  python3 reporter_isoform.py -t 2 --liqa /path/to/liqa --liqa_ref example/GRCh38_chr22.liqa.refgene
   ```
 
 ### 5.3 single cell SNV profile
@@ -541,13 +598,20 @@ This version of scNanoGPS detects the gene expression, isoform, and single nucle
                           Scanner log file name. Default: read_length.tsv.gz
     --CB_file=CB_FILE     File name for filtered barcode list. Default:
                           filtered_barcode_list.txt
-    --exp_tb=EXP_TB       Counting table name. Default: matrix.tsv
+    --exp_tb=EXP_TB       Counting table name. Default: matrix.tsv.gz
+    --mrg_bam=MRG_BAM     Merged bam file. Default: None
     --ref_genome=REF_GENOME
                           * Required ! File for reference genome.
     --gtf=GTF             * Required ! Genome annotation file GTF.
-    --log=LOG_F_NAME      Log file name. Default: summary.txt
+    --log=LOG_F_NAME      Log file name. Default: logs/summary.txt
     --samtools=SAMTOOLS   Path to samtools. Default: samtools
     --qualimap=QUALIMAP   Path to qualimap. Default: qualimap
+    --qualimap_param=QUALIMAP_PARAM
+                          Additional parameters to qualimap. For example:
+                          --java-mem-size=4G
+    --keep_meta=KEEP_META
+                          Set it to 1 to keep meta data, e.g. sam files, for
+                          futher checking. Default: None
   ```
 
 - Example code for generating final summary
