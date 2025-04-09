@@ -228,9 +228,9 @@ def filter_bam_inc(fq_pref, options):
 
 		cmd = ""
 		if not options.keep_meta:
-			cmd += "cp "
-		else:
 			cmd += "mv "
+		else:
+			cmd += "cp "
 		cmd += os.path.join(options.tmp_dir, fq_pref) + ".minimap2.selected.bam " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam"
 		os.system(cmd)
 
@@ -246,9 +246,9 @@ def filter_bam_exc(fq_pref, options):
 
 		cmd = ""
 		if not options.keep_meta:
-			cmd += "cp "
-		else:
 			cmd += "mv "
+		else:
+			cmd += "cp "
 		cmd += os.path.join(options.tmp_dir, fq_pref) + ".minimap2.unselected.bam " + os.path.join(options.tmp_dir, fq_pref) + ".minimap2.bam"
 		os.system(cmd)
 
