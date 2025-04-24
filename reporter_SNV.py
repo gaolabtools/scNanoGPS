@@ -220,7 +220,7 @@ def merge_mpileup(CB_list, options):
 		dp_df = dp_df.merge(pileup_df.loc[:, ['CHROM', 'POS', 'ALT']], how = 'left', on = ['CHROM', 'POS'])
 
 		dp_df[CB] = ""
-		dp_df['REF_no'] = dp_df['MATCH'].str.count("[\.\,]").astype('Int64')
+		dp_df['REF_no'] = dp_df['MATCH'].str.count("[\\.\\,]").astype('Int64')
 		dp_df['A']      = dp_df['MATCH'].str.count('A').astype('Int64') + dp_df['MATCH'].str.count('a').astype('Int64')
 		dp_df['T']      = dp_df['MATCH'].str.count('T').astype('Int64') + dp_df['MATCH'].str.count('t').astype('Int64')
 		dp_df['C']      = dp_df['MATCH'].str.count('C').astype('Int64') + dp_df['MATCH'].str.count('c').astype('Int64')
