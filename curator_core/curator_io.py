@@ -366,7 +366,7 @@ def curation_master(fq, options):
 		con_o = open(os.path.join(options.tmp_dir, fq_pref) + ".consensus.fasta", "wt")
 		for readID in uniq_consensus:
 			con_o.write(">" + readID + "\n")
-			con_o.write(uniq_consensus[readID])
+			con_o.write(uniq_consensus[readID] + "\n")
 		con_o.close()
 
 		bam_i = pysam.AlignmentFile(os.path.join(options.tmp_dir, fq_pref) + ".filtered.bam",  "rb")
