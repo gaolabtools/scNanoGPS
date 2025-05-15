@@ -98,10 +98,6 @@ if __name__ == "__main__":
 			writer.close()
 	BC_list.close()
 	fastq_f.close()
-	if not options.keep_meta:
-		os.system("mv " + options.fq_name  + " " + options.tmp_dir)
-		os.system("mv " + options.CB_count + " " + options.tmp_dir)
-		os.system("mv " + options.CB_mrg   + " " + options.tmp_dir)
 
 	print("            \rDone\n", flush = True)
 	print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()), "\n", flush = True)
@@ -120,6 +116,11 @@ if __name__ == "__main__":
 	print("\nTime stamp: " + time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime()), "\n", flush = True)
 	hours, minutes, seconds = misc.get_time_elapse(start_time)
 	misc.report_time_elapse(hours, minutes, seconds)
+
+	if not options.keep_meta:
+		os.system("mv " + options.fq_name  + " " + options.tmp_dir)
+		os.system("mv " + options.CB_count + " " + options.tmp_dir)
+		os.system("mv " + options.CB_mrg   + " " + options.tmp_dir)
 
 	logger.write("\nCuration process time spent: %d : %d : %.2f\n" % (hours, minutes, seconds))
 	logger.close()
