@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-
 import glob, os, sys
 from optparse import OptionParser
 
@@ -159,10 +158,20 @@ wbc_cmd, exc_cmd = '', ''
 oh = open("run_scNanoGPS.sh", "wt")
 oh.write('#! /bin/bash' + "\n\n")
 oh.write('P_DIR="' + os.path.dirname(os.path.abspath(__file__)) + '"' + "\n")
+
+if options.o_dir != "scNanoGPS_res":
+	oh.write('OUT_DIR="' + options.o_dir + '"' + "\n")
+	custom_dir="-d $OUT_DIR "
+
+if options.tmp_dir != "tmp":
+	oh.write('TMP_DIR="' + options.tmp_dir + '"' + "\n")
+	custom_tmp_dir="--tmp_dir $TMP_DIR "
+	
 oh.write('FASTQ="' + os.path.abspath(os.path.expanduser(options.fq_f_name)) + '"' + "\n")
 oh.write('REF_GENOME="' + os.path.abspath(os.path.expanduser(options.ref_genome)) + '"' + "\n")
 oh.write('IND_GENOME="' + os.path.abspath(os.path.expanduser(options.idx_genome)) + '"' + "\n")
 oh.write('GENOME_ANNOTATION="' + os.path.abspath(os.path.expanduser(options.gtf)) + '"' + "\n")
+
 if options.whitelist:
 	wbc_cmd = '--whitelist $WBC'
 	oh.write('WBC="' + os.path.abspath(os.path.expanduser(options.whitelist)) + '"' + "\n")
@@ -179,23 +188,23 @@ if options.annovar:
 	oh.write('ANNOVAR_PROTOCOL="' + options.annovarprot + '"' + "\n")
 	oh.write('ANNOVAR_OP="' + options.annovarop + '"' + "\n")
 	oh.write('ANNOVAR_XREF="' + os.path.join(options.annovar, options.annovar_xref) + '"' + "\n")
+	
 oh.write('PT_SEQ="' + options.pT + '"' + "\n")
 oh.write("\n")
-oh.write('python3 $P_DIR/other_utils/read_length_profiler.py -i $FASTQ &> logs/run_read_length_profiler.log.txt &' + "\n")
-oh.write('python3 $P_DIR/scanner.py -t $ncores -i $FASTQ --pT $PT_SEQ &> logs/run_scanner.log.txt' + "\n")
-oh.write('python3 $P_DIR/assigner.py -t $ncores ' + wbc_cmd + ' &> logs/run_assigner.log.txt' + "\n")
-oh.write('python3 $P_DIR/curator.py -t $ncores --ref_genome $REF_GENOME --idx_genome $IND_GENOME ' + exc_cmd + ' &> logs/run_curator.log.txt' + "\n")
-oh.write('python3 $P_DIR/reporter_expression.py -t $ncores --gtf $GENOME_ANNOTATION &> logs/run_reporter_expression.log.txt' + "\n")
+oh.write('python3 $P_DIR/other_utils/read_length_profiler.py -i $FASTQ ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + ' &> logs/run_read_length_profiler.log.txt' + "\n")
+oh.write('python3 $P_DIR/scanner.py -t $ncores -i $FASTQ --pT $PT_SEQ ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + ' &> logs/run_scanner.log.txt' + "\n")
+oh.write('python3 $P_DIR/assigner.py -t $ncores ' + wbc_cmd + (f" {custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + (f" {custom_tmp_dir}" if 'custom_tmp_dir' in locals() and custom_tmp_dir else "") + ' &> logs/run_assigner.log.txt' + "\n")
+oh.write('python3 $P_DIR/curator.py -t $ncores --ref_genome $REF_GENOME --idx_genome $IND_GENOME ' + exc_cmd + (f" {custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + (f" {custom_tmp_dir}" if 'custom_tmp_dir' in locals() and custom_tmp_dir else "") + ' &> logs/run_curator.log.txt' + "\n")
+oh.write('python3 $P_DIR/reporter_expression.py -t $ncores --gtf $GENOME_ANNOTATION ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + (f" {custom_tmp_dir}" if 'custom_tmp_dir' in locals() and custom_tmp_dir else "") + ' &> logs/run_reporter_expression.log.txt' + "\n")
 if options.isoquant:
-	oh.write('python3 $P_DIR/reporter_isoform.py -t $ncores --ref_genome $REF_GENOME --gtf $GENOME_ANNOTATION --isoquant $ISOQUANT &> logs/run_reporter_isoform.log.txt' + "\n")
+	oh.write('python3 $P_DIR/reporter_isoform.py -t $ncores --ref_genome $REF_GENOME --gtf $GENOME_ANNOTATION --isoquant $ISOQUANT ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + (f" {custom_tmp_dir}" if 'custom_tmp_dir' in locals() and custom_tmp_dir else "") + ' &> logs/run_reporter_isoform.log.txt' + "\n")
 if options.annovar:
-	oh.write('python3 $P_DIR/reporter_SNV.py -t $ncores --ref_genome $REF_GENOME --annovar $ANNOVAR --annovar_db $ANNOVAR_DB --annovar_gv $ANNOVAR_GV --annovar_protocol $ANNOVAR_PROTOCOL --annovar_operation $ANNOVAR_OP --annovar_xref $ANNOVAR_XREF &> logs/run_reporter_SNV.log.txt' + "\n")
-	oh.write('python3 $P_DIR/other_utils/parse_annovar_column.py -i scNanoGPS_res/annovar.hg38_multianno.vcf > scNanoGPS_res/annovar.hg38_multianno.tsv' + "\n")
+	oh.write('python3 $P_DIR/reporter_SNV.py -t $ncores --ref_genome $REF_GENOME --annovar $ANNOVAR --annovar_db $ANNOVAR_DB --annovar_gv $ANNOVAR_GV --annovar_protocol $ANNOVAR_PROTOCOL --annovar_operation $ANNOVAR_OP --annovar_xref $ANNOVAR_XREF ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + (f" {custom_tmp_dir}" if 'custom_tmp_dir' in locals() and custom_tmp_dir else "") + ' &> logs/run_reporter_SNV.log.txt' + "\n")
+	oh.write('python3 $P_DIR/other_utils/parse_annovar_column.py -i ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "scNanoGPS_res") + '/annovar.hg38_multianno.vcf > ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "scNanoGPS_res") + '/annovar.hg38_multianno.tsv' + "\n")
 mrg_bam_param = ""
 if options.isoquant:
-	mrg_bam_param = "--mrg_bam scNanoGPS_res/IsoQuant_res/merged.curated.minimap2.bam"
-oh.write('python3 $P_DIR/reporter_summary.py --ref_genome $REF_GENOME --gtf $GENOME_ANNOTATION ' + mrg_bam_param + ' --qualimap_param "--java-mem-size=300G" &> logs/run_reporter_summary.log.txt' + "\n")
+	mrg_bam_param = "--mrg_bam " + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "scNanoGPS_res") + "/IsoQuant_res/merged.curated.minimap2.bam"
+oh.write('python3 $P_DIR/reporter_summary.py --ref_genome $REF_GENOME --gtf $GENOME_ANNOTATION ' + mrg_bam_param + ' --qualimap_param "--java-mem-size=300G" ' + (f"{custom_dir}" if 'custom_dir' in locals() and custom_dir else "") + (f" {custom_tmp_dir}" if 'custom_tmp_dir' in locals() and custom_tmp_dir else "") + ' &> logs/run_reporter_summary.log.txt' + "\n")
 oh.close()
 
 print("\n *** Please review or edit the script file 'run_scNanoGPS.sh' and then run it ! *** \n")
-
